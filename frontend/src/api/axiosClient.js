@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const DEFAULT_BASE_URL = 'http://localhost:8080/api';
-const baseURL = import.meta?.env?.VITE_API_BASE_URL || DEFAULT_BASE_URL;
-const timeout = Number(import.meta?.env?.VITE_API_TIMEOUT_MS || 15000);
+const baseURL = import.meta.env.VITE_API_BASE_URL || DEFAULT_BASE_URL;
+const timeout = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
 
 // Dùng CustomEvent thay vì window.location.assign để tránh reload cứng gây màn hình đen
 let redirectingToLogin = false;
