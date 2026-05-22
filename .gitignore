@@ -1,0 +1,13 @@
+node_modules/
+.idea/
+.DS_Store
+target/
+
+*.log
+*.class
+*.jar
+
+*.iml
+
+# OS
+.DS_Store

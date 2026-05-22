@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GoMart — Siêu Thị Mini Online</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/auth-additions.css" />
+  </head>
+  <body>
+    <!-- Promo Strip -->
+    <div class="promo-strip">
+      <span><i class="fas fa-truck-fast"></i> Freeship đơn từ 200k</span>
+      <span>·</span>
+      <span><i class="fas fa-shield-halved"></i> Cam kết chính hãng 100%</span>
+      <span>·</span>
+      <span><i class="fas fa-rotate-left"></i> Đổi trả miễn phí 7 ngày</span>
+    </div>
+
+    <!-- Header -->
+    <header class="header" id="header">
+      <div class="container header__inner">
+        <a href="index.html" class="header__logo">
+          <div class="logo-mark"><span class="logo-w">G</span></div>
+          <div class="logo-text">
+            <span
+              ><span class="logo-go">Go</span
+              ><span class="logo-mart">Mart</span></span
+            >
+            <span class="logo-tagline">Siêu thị mini online</span>
+          </div>
+        </a>
+        <div class="header__search">
+          <div class="search-box">
+            <i class="fas fa-search search-icon"></i>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Tìm kiếm sản phẩm... (VD: Sữa Vinamilk)"
+            />
+            <button class="search-btn">
+              <i class="fas fa-search"></i> Tìm
+            </button>
+          </div>
+          <div class="search-suggestions" id="searchSuggestions"></div>
+        </div>
+        <div class="header__actions">
+          <a href="#" class="action-btn">
+            <div class="action-icon">
+              <i class="fas fa-heart"></i
+              ><span class="wishlist-badge badge">0</span>
+            </div>
+            <span class="action-label">Yêu thích</span>
+          </a>
+          <a href="#" class="action-btn" id="cartBtn">
+            <div class="action-icon">
+              <i class="fas fa-cart-shopping"></i
+              ><span class="cart-badge badge">0</span>
+            </div>
+            <span class="action-label">Giỏ hàng</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="container navbar__inner">
+        <button class="navbar__menu-btn" id="categoryToggle">
+          <i class="fas fa-bars-staggered"></i> Danh mục
+          <i class="fas fa-chevron-down" style="font-size: 10px"></i>
+        </button>
+        <ul class="navbar__links">
+          <li><a href="index.html" class="active">Trang chủ</a></li>
+          <li><a href="category.html">Tất cả sản phẩm</a></li>
+          <li><a href="category.html?cat=fresh">Thực phẩm tươi</a></li>
+          <li><a href="category.html?cat=drink">Đồ uống</a></li>
+          <li>
+            <a href="category.html"
+              >Khuyến mãi <span class="nav-badge">HOT</span></a
+            >
+          </li>
+        </ul>
+      </div>
+      <div class="category-dropdown" id="categoryDropdown">
+        <div class="container">
+          <ul class="cat-list">
+            <li>
+              <a href="category.html?cat=fresh"
+                ><i class="fas fa-fish"></i> Thực phẩm tươi sống</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=dairy"
+                ><i class="fas fa-egg"></i> Sữa & Trứng</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=drink"
+                ><i class="fas fa-bottle-water"></i> Đồ uống</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=snack"
+                ><i class="fas fa-cookie-bite"></i> Bánh & Snack</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=personal"
+                ><i class="fas fa-pump-soap"></i> Chăm sóc cá nhân</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=household"
+                ><i class="fas fa-blender"></i> Gia dụng</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=vegetable"
+                ><i class="fas fa-carrot"></i> Rau củ quả</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <main>
+      <!-- Hero Section -->
+      <section class="hero">
+        <div class="container hero__inner">
+          <aside class="hero__sidebar"></aside>
+          <div class="hero__slider" id="heroSlider">
+            <div class="slider-track" id="sliderTrack">
+              <div class="slide slide--1">
+                <div class="slide__content">
+                  <div class="slide__tag">🎉 Ưu đãi hôm nay</div>
+                  <h2>Giảm 50%<br />Thực Phẩm Tươi</h2>
+                  <p>Hàng ngàn sản phẩm tươi ngon mỗi ngày</p>
+                  <a href="category.html?cat=fresh" class="slide__btn"
+                    ><i class="fas fa-bolt"></i> Mua ngay</a
+                  >
+                </div>
+                <span class="slide__emoji">🥦🍅</span>
+              </div>
+              <div class="slide slide--2">
+                <div class="slide__content">
+                  <div class="slide__tag">🚚 Ưu đãi vận chuyển</div>
+                  <h2>Freeship<br />Toàn Quốc</h2>
+                  <p>Đơn từ 200.000đ — Giao trong 2 giờ</p>
+                  <a href="category.html" class="slide__btn"
+                    ><i class="fas fa-arrow-right"></i> Xem ngay</a
+                  >
+                </div>
+                <span class="slide__emoji">📦🚚</span>
+              </div>
+              <div class="slide slide--3">
+                <div class="slide__content">
+                  <div class="slide__tag">⚡ Flash Sale</div>
+                  <h2>Giảm Đến<br />45% Mỗi Ngày</h2>
+                  <p>Hàng trăm sản phẩm flash sale hàng ngày</p>
+                  <a href="category.html" class="slide__btn"
+                    ><i class="fas fa-fire"></i> Săn ngay</a
+                  >
+                </div>
+                <span class="slide__emoji">⚡🛒</span>
+              </div>
+            </div>
+            <button class="slider-btn slider-btn--prev" id="sliderPrev">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="slider-btn slider-btn--next" id="sliderNext">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+            <div class="slider-dots" id="sliderDots">
+              <span class="dot active" data-idx="0"></span>
+              <span class="dot" data-idx="1"></span>
+              <span class="dot" data-idx="2"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Category Quick Links -->
+      <section class="cat-quick-section">
+        <div class="container">
+          <div class="cat-quick-grid" id="categoryQuickLinks"></div>
+        </div>
+      </section>
+
+      <!-- Flash Sale -->
+      <section class="flash-section">
+        <div class="container">
+          <div class="flash-header">
+            <div>
+              <div class="flash-title">
+                <i class="fas fa-bolt"></i> Flash Sale
+              </div>
+              <div class="flash-subtitle">Giảm giá sốc — Số lượng có hạn!</div>
+            </div>
+            <div class="flash-countdown" id="flashCountdown"></div>
+            <a
+              href="category.html"
+              style="
+                color: rgba(255, 255, 255, 0.8);
+                font-size: 13px;
+                font-weight: 600;
+                margin-left: 16px;
+                white-space: nowrap;
+              "
+              >Xem tất cả <i class="fas fa-arrow-right"></i
+            ></a>
+          </div>
+          <div class="flash-grid" id="flashSaleGrid"></div>
+        </div>
+      </section>
+
+      <!-- Featured Products -->
+      <section class="section">
+        <div class="container">
+          <div class="section-header">
+            <h2 class="section-title">Sản phẩm nổi bật</h2>
+            <a href="category.html" class="section-link"
+              >Xem tất cả <i class="fas fa-chevron-right"></i
+            ></a>
+          </div>
+          <div class="products-grid" id="featuredGrid"></div>
+        </div>
+      </section>
+
+      <!-- New Arrivals -->
+      <section class="section" style="padding-top: 0">
+        <div class="container">
+          <div class="section-header">
+            <h2 class="section-title">Hàng mới về</h2>
+            <a href="category.html" class="section-link"
+              >Xem thêm <i class="fas fa-chevron-right"></i
+            ></a>
+          </div>
+          <div class="products-grid" id="newArrivalsGrid"></div>
+        </div>
+      </section>
+
+      <!-- Promotions Banner -->
+      <section style="padding: 0 0 40px">
+        <div class="container">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px">
+            <div
+              style="
+                background: linear-gradient(135deg, #1e8a40, #25a04c);
+                border-radius: 16px;
+                padding: 28px;
+                color: #fff;
+                display: flex;
+                align-items: center;
+                gap: 20px;
+              "
+            >
+              <div style="font-size: 60px">🚚</div>
+              <div>
+                <div
+                  style="font-size: 19px; font-weight: 800; margin-bottom: 4px"
+                >
+                  Freeship mọi đơn
+                </div>
+                <div style="font-size: 14px; opacity: 0.85">
+                  Từ 200.000đ — Giao tận nơi 2 giờ
+                </div>
+              </div>
+            </div>
+            <div
+              style="
+                background: linear-gradient(135deg, #c62828, #ef5350);
+                border-radius: 16px;
+                padding: 28px;
+                color: #fff;
+                display: flex;
+                align-items: center;
+                gap: 20px;
+              "
+            >
+              <div style="font-size: 60px">🎁</div>
+              <div>
+                <div
+                  style="font-size: 19px; font-weight: 800; margin-bottom: 4px"
+                >
+                  Quà tặng mỗi ngày
+                </div>
+                <div style="font-size: 14px; opacity: 0.85">
+                  Đơn trên 500k nhận quà ngay
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Cart Overlay & Sidebar -->
+    <div class="cart-overlay" id="cartOverlay"></div>
+    <div class="cart-sidebar" id="cartSidebar">
+      <div class="cart-sidebar__header">
+        <h3><i class="fas fa-cart-shopping"></i> Giỏ hàng của bạn</h3>
+        <button class="cart-close" id="cartClose">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div id="freeShipBar"></div>
+      <div class="cart-sidebar__body" id="cartItems"></div>
+      <div class="cart-sidebar__footer" id="cartFooter" style="display: none">
+        <div class="cart-totals-row">
+          <span>Tạm tính:</span><span id="cartSubtotal">0đ</span>
+        </div>
+        <div class="cart-totals-row">
+          <span>Phí vận chuyển:</span><span id="cartShipping">30.000đ</span>
+        </div>
+        <div class="cart-total">
+          <span>Tổng cộng:</span><strong id="cartTotal">0đ</strong>
+        </div>
+        <button class="checkout-btn btn-checkout">
+          <i class="fas fa-lock"></i> Thanh toán an toàn
+        </button>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="footer-top">
+        <div class="container">
+          <div class="footer-grid">
+            <div class="footer-brand">
+              <div class="header__logo">
+                <div class="logo-mark"><span class="logo-w">G</span></div>
+                <div class="logo-text">
+                  <span
+                    ><span class="logo-go">Go</span
+                    ><span class="logo-mart">Mart</span></span
+                  >
+                </div>
+              </div>
+              <p>
+                Siêu thị mini online — Mua sắm thông minh, giao hàng nhanh
+                chóng. Cam kết hàng chính hãng, giá tốt nhất.
+              </p>
+              <div class="footer-social">
+                <a href="#"><i class="fab fa-facebook-f"></i></a>
+                <a href="#"><i class="fab fa-instagram"></i></a>
+                <a href="#"><i class="fab fa-tiktok"></i></a>
+                <a href="#"><i class="fab fa-youtube"></i></a>
+              </div>
+            </div>
+            <div class="footer-col">
+              <h4>Danh mục</h4>
+              <ul>
+                <li><a href="category.html?cat=fresh">Thực phẩm tươi</a></li>
+                <li><a href="category.html?cat=dairy">Sữa & Trứng</a></li>
+                <li><a href="category.html?cat=drink">Đồ uống</a></li>
+                <li><a href="category.html?cat=snack">Bánh & Snack</a></li>
+                <li>
+                  <a href="category.html?cat=personal">Chăm sóc cá nhân</a>
+                </li>
+              </ul>
+            </div>
+            <div class="footer-col">
+              <h4>Hỗ trợ</h4>
+              <ul>
+                <li><a href="#">Trung tâm hỗ trợ</a></li>
+                <li><a href="#">Chính sách đổi trả</a></li>
+                <li><a href="#">Chính sách bảo mật</a></li>
+                <li><a href="#">Điều khoản sử dụng</a></li>
+                <li><a href="#">Liên hệ chúng tôi</a></li>
+              </ul>
+            </div>
+            <div class="footer-col">
+              <h4>Liên hệ</h4>
+              <ul>
+                <li>
+                  <a href="#"
+                    ><i
+                      class="fas fa-phone"
+                      style="margin-right: 6px; color: #4ade80"
+                    ></i>
+                    1800 1234</a
+                  >
+                </li>
+                <li>
+                  <a href="#"
+                    ><i
+                      class="fas fa-envelope"
+                      style="margin-right: 6px; color: #4ade80"
+                    ></i>
+                    <span
+                      class="__cf_email__"
+                      data-cfemail="1a727f7676755a7d75777b686e346c74"
+                      >[email&#160;protected]</span
+                    ></a
+                  >
+                </li>
+                <li>
+                  <a href="#"
+                    ><i
+                      class="fas fa-location-dot"
+                      style="margin-right: 6px; color: #4ade80"
+                    ></i>
+                    TP. Hồ Chí Minh</a
+                  >
+                </li>
+                <li>
+                  <a href="#"
+                    ><i
+                      class="fas fa-clock"
+                      style="margin-right: 6px; color: #4ade80"
+                    ></i>
+                    7:00 – 22:00 mỗi ngày</a
+                  >
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="container footer-bottom">
+        <span style="color: rgba(255, 255, 255, 0.5)"
+          >© 2024 GoMart. Mọi quyền được bảo lưu.</span
+        >
+        <div class="footer-payments">
+          <div class="payment-icon">VISA</div>
+          <div class="payment-icon">MasterCard</div>
+          <div class="payment-icon">MoMo</div>
+          <div class="payment-icon">ZaloPay</div>
+          <div class="payment-icon">COD</div>
+        </div>
+      </div>
+    </footer>
+
+    <button id="scrollTopBtn"><i class="fas fa-chevron-up"></i></button>
+    <div class="toast" id="toast"></div>
+
+    <script
+      data-cfasync="false"
+      src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"
+    ></script>
+    <script src="js/data.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/cart.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/slider.js"></script>
+    <script src="js/main.js"></script>
+  </body>
+</html>

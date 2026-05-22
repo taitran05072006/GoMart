@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GoMart — Tất Cả Sản Phẩm</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/auth-additions.css" />
+  </head>
+  <body>
+    <header class="header" id="header">
+      <div class="container header__inner">
+        <a href="index.html" class="header__logo">
+          <div class="logo-mark"><span class="logo-w">G</span></div>
+          <div class="logo-text">
+            <span
+              ><span class="logo-go">Go</span
+              ><span class="logo-mart">Mart</span></span
+            >
+            <span class="logo-tagline">Siêu thị mini online</span>
+          </div>
+        </a>
+        <div class="header__search">
+          <div class="search-box">
+            <i class="fas fa-search search-icon"></i>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Tìm kiếm sản phẩm..."
+            />
+            <button class="search-btn">
+              <i class="fas fa-search"></i> Tìm
+            </button>
+          </div>
+          <div class="search-suggestions" id="searchSuggestions"></div>
+        </div>
+        <div class="header__actions">
+          <a href="#" class="action-btn">
+            <div class="action-icon">
+              <i class="fas fa-heart"></i
+              ><span class="wishlist-badge badge">0</span>
+            </div>
+            <span class="action-label">Yêu thích</span>
+          </a>
+          <a href="#" class="action-btn" id="cartBtn">
+            <div class="action-icon">
+              <i class="fas fa-cart-shopping"></i
+              ><span class="cart-badge badge">0</span>
+            </div>
+            <span class="action-label">Giỏ hàng</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <nav class="navbar">
+      <div class="container navbar__inner">
+        <button class="navbar__menu-btn" id="categoryToggle">
+          <i class="fas fa-bars-staggered"></i> Danh mục
+          <i class="fas fa-chevron-down" style="font-size: 10px"></i>
+        </button>
+        <ul class="navbar__links">
+          <li><a href="index.html">Trang chủ</a></li>
+          <li><a href="category.html" class="active">Tất cả sản phẩm</a></li>
+          <li><a href="category.html?cat=fresh">Thực phẩm tươi</a></li>
+          <li><a href="category.html?cat=drink">Đồ uống</a></li>
+        </ul>
+      </div>
+      <div class="category-dropdown" id="categoryDropdown">
+        <div class="container">
+          <ul class="cat-list">
+            <li>
+              <a href="category.html?cat=fresh"
+                ><i class="fas fa-fish"></i> Thực phẩm tươi sống</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=dairy"
+                ><i class="fas fa-egg"></i> Sữa & Trứng</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=drink"
+                ><i class="fas fa-bottle-water"></i> Đồ uống</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=snack"
+                ><i class="fas fa-cookie-bite"></i> Bánh & Snack</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=personal"
+                ><i class="fas fa-pump-soap"></i> Chăm sóc cá nhân</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=household"
+                ><i class="fas fa-blender"></i> Gia dụng</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=vegetable"
+                ><i class="fas fa-carrot"></i> Rau củ quả</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="breadcrumb-wrap">
+      <div class="container">
+        <ul class="breadcrumb">
+          <li><a href="index.html">Trang chủ</a></li>
+          <li><i class="fas fa-chevron-right"></i></li>
+          <li class="active">Tất cả sản phẩm</li>
+        </ul>
+      </div>
+    </div>
+
+    <main class="category-page">
+      <div class="container">
+        <!-- Category Pills -->
+        <div class="category-pills-row">
+          <div class="cat-pills" id="categoryPills"></div>
+        </div>
+
+        <div class="category-layout">
+          <!-- Sidebar Filters -->
+          <aside class="category-sidebar">
+            <div class="filter-block">
+              <h3 class="filter-title">
+                <i
+                  class="fas fa-tag"
+                  style="color: var(--green); margin-right: 6px"
+                ></i
+                >Danh mục
+              </h3>
+              <ul class="filter-links">
+                <li>
+                  <a href="category.html?cat=all" class="active"
+                    >Tất cả sản phẩm</a
+                  >
+                </li>
+                <li>
+                  <a href="category.html?cat=fresh"
+                    ><i
+                      class="fas fa-fish"
+                      style="
+                        margin-right: 6px;
+                        color: var(--green);
+                        font-size: 12px;
+                      "
+                    ></i
+                    >Thực phẩm tươi</a
+                  >
+                </li>
+                <li>
+                  <a href="category.html?cat=dairy"
+                    ><i
+                      class="fas fa-egg"
+                      style="
+                        margin-right: 6px;
+                        color: var(--green);
+                        font-size: 12px;
+                      "
+                    ></i
+                    >Sữa & Trứng</a
+                  >
+                </li>
+                <li>
+                  <a href="category.html?cat=drink"
+                    ><i
+                      class="fas fa-bottle-water"
+                      style="
+                        margin-right: 6px;
+                        color: var(--green);
+                        font-size: 12px;
+                      "
+                    ></i
+                    >Đồ uống</a
+                  >
+                </li>
+                <li>
+                  <a href="category.html?cat=snack"
+                    ><i
+                      class="fas fa-cookie-bite"
+                      style="
+                        margin-right: 6px;
+                        color: var(--green);
+                        font-size: 12px;
+                      "
+                    ></i
+                    >Bánh & Snack</a
+                  >
+                </li>
+                <li>
+                  <a href="category.html?cat=personal"
+                    ><i
+                      class="fas fa-pump-soap"
+                      style="
+                        margin-right: 6px;
+                        color: var(--green);
+                        font-size: 12px;
+                      "
+                    ></i
+                    >Chăm sóc cá nhân</a
+                  >
+                </li>
+                <li>
+                  <a href="category.html?cat=household"
+                    ><i
+                      class="fas fa-blender"
+                      style="
+                        margin-right: 6px;
+                        color: var(--green);
+                        font-size: 12px;
+                      "
+                    ></i
+                    >Gia dụng</a
+                  >
+                </li>
+                <li>
+                  <a href="category.html?cat=vegetable"
+                    ><i
+                      class="fas fa-carrot"
+                      style="
+                        margin-right: 6px;
+                        color: var(--green);
+                        font-size: 12px;
+                      "
+                    ></i
+                    >Rau củ quả</a
+                  >
+                </li>
+              </ul>
+            </div>
+            <div class="filter-block">
+              <h3 class="filter-title">
+                <i
+                  class="fas fa-filter"
+                  style="color: var(--green); margin-right: 6px"
+                ></i
+                >Mức giá
+              </h3>
+              <ul class="filter-checkbox">
+                <li>
+                  <label
+                    ><input
+                      type="checkbox"
+                      class="price-filter"
+                      value="0-50000"
+                    />
+                    <span>Dưới 50.000đ</span></label
+                  >
+                </li>
+                <li>
+                  <label
+                    ><input
+                      type="checkbox"
+                      class="price-filter"
+                      value="50000-100000"
+                    />
+                    <span>50.000đ – 100.000đ</span></label
+                  >
+                </li>
+                <li>
+                  <label
+                    ><input
+                      type="checkbox"
+                      class="price-filter"
+                      value="100000-999999"
+                    />
+                    <span>Trên 100.000đ</span></label
+                  >
+                </li>
+              </ul>
+            </div>
+            <div class="filter-block">
+              <h3 class="filter-title">
+                <i
+                  class="fas fa-star"
+                  style="color: var(--yellow); margin-right: 6px"
+                ></i
+                >Đánh giá
+              </h3>
+              <ul class="filter-checkbox">
+                <li>
+                  <label
+                    ><input type="checkbox" />
+                    <span>⭐⭐⭐⭐⭐ 5 sao</span></label
+                  >
+                </li>
+                <li>
+                  <label
+                    ><input type="checkbox" />
+                    <span>⭐⭐⭐⭐ 4 sao trở lên</span></label
+                  >
+                </li>
+              </ul>
+            </div>
+            <div
+              class="filter-block"
+              style="
+                background: var(--green-pale);
+                border-color: var(--green-light);
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  color: var(--green);
+                  font-weight: 800;
+                  margin-bottom: 8px;
+                  font-size: 14px;
+                "
+              >
+                <i class="fas fa-truck-fast"></i> Giao hàng nhanh
+              </div>
+              <p style="font-size: 13px; color: var(--gray-600)">
+                Freeship đơn từ 200.000đ. Giao trong 2 giờ nội thành.
+              </p>
+            </div>
+          </aside>
+
+          <!-- Main Content -->
+          <div class="category-main">
+            <div class="category-toolbar">
+              <div class="toolbar-left">
+                Tìm thấy <strong id="productCount">0</strong> sản phẩm
+              </div>
+              <div class="toolbar-right">
+                <label for="sortSelect" style="font-weight: 600"
+                  >Sắp xếp:</label
+                >
+                <select id="sortSelect" class="sort-select">
+                  <option value="default">Mặc định</option>
+                  <option value="price_asc">Giá: Thấp → Cao</option>
+                  <option value="price_desc">Giá: Cao → Thấp</option>
+                  <option value="rating">Đánh giá cao nhất</option>
+                  <option value="discount">Giảm giá nhiều nhất</option>
+                </select>
+              </div>
+            </div>
+            <div class="products-grid" id="categoryGrid"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <div class="cart-overlay" id="cartOverlay"></div>
+    <div class="cart-sidebar" id="cartSidebar">
+      <div class="cart-sidebar__header">
+        <h3><i class="fas fa-cart-shopping"></i> Giỏ hàng của bạn</h3>
+        <button class="cart-close" id="cartClose">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div id="freeShipBar"></div>
+      <div class="cart-sidebar__body" id="cartItems"></div>
+      <div class="cart-sidebar__footer" id="cartFooter" style="display: none">
+        <div class="cart-totals-row">
+          <span>Tạm tính:</span><span id="cartSubtotal">0đ</span>
+        </div>
+        <div class="cart-totals-row">
+          <span>Phí vận chuyển:</span><span id="cartShipping">30.000đ</span>
+        </div>
+        <div class="cart-total">
+          <span>Tổng cộng:</span><strong id="cartTotal">0đ</strong>
+        </div>
+        <button class="checkout-btn btn-checkout">
+          <i class="fas fa-lock"></i> Thanh toán an toàn
+        </button>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/cart.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/slider.js"></script>
+    <script src="js/main.js"></script>
+  </body>
+</html>

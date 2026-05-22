@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GoMart — Đặt hàng thành công</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/auth-additions.css" />
+    <style>
+      .success-container {
+        max-width: 600px;
+        margin: 60px auto;
+        background: #fff;
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        text-align: center;
+      }
+      .success-icon {
+        font-size: 72px;
+        color: var(--green);
+        margin-bottom: 20px;
+      }
+      .success-title {
+        font-size: 24px;
+        color: var(--gray-800);
+        margin-bottom: 12px;
+      }
+      .success-desc {
+        color: var(--gray-600);
+        margin-bottom: 30px;
+        line-height: 1.6;
+      }
+      .order-info {
+        background: var(--gray-50);
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        text-align: left;
+      }
+      .btn-primary {
+        display: inline-block;
+        background: var(--green);
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: opacity 0.2s;
+      }
+      .btn-primary:hover {
+        opacity: 0.9;
+      }
+    </style>
+  </head>
+  <body style="background: var(--gray-50)">
+    <header
+      class="header"
+      id="header"
+      style="border-bottom: 1px solid var(--gray-200); background: #fff"
+    >
+      <div class="container header__inner">
+        <a href="index.html" class="header__logo">
+          <div class="logo-mark"><span class="logo-w">G</span></div>
+          <div class="logo-text">
+            <span
+              ><span class="logo-go">Go</span
+              ><span class="logo-mart">Mart</span></span
+            >
+          </div>
+        </a>
+      </div>
+    </header>
+
+    <div
+      style="
+        background: var(--white);
+        border-bottom: 1px solid var(--gray-200);
+        padding: 14px 0;
+      "
+    >
+      <div
+        class="container"
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--green);
+            font-weight: 700;
+            font-size: 14px;
+          "
+        >
+          <div
+            style="
+              width: 26px;
+              height: 26px;
+              border-radius: 50%;
+              background: var(--green);
+              color: #fff;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 12px;
+              font-weight: 800;
+            "
+          >
+            ✓
+          </div>
+          Giỏ hàng
+        </div>
+        <div
+          style="
+            flex: 1;
+            max-width: 80px;
+            height: 2px;
+            background: var(--green);
+            border-radius: 2px;
+          "
+        ></div>
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--green);
+            font-weight: 700;
+            font-size: 14px;
+          "
+        >
+          <div
+            style="
+              width: 26px;
+              height: 26px;
+              border-radius: 50%;
+              background: var(--green);
+              color: #fff;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 12px;
+              font-weight: 800;
+            "
+          >
+            ✓
+          </div>
+          Thông tin
+        </div>
+        <div
+          style="
+            flex: 1;
+            max-width: 80px;
+            height: 2px;
+            background: var(--green);
+            border-radius: 2px;
+          "
+        ></div>
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--green);
+            font-weight: 700;
+            font-size: 14px;
+          "
+        >
+          <div
+            style="
+              width: 26px;
+              height: 26px;
+              border-radius: 50%;
+              background: var(--green);
+              color: #fff;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 12px;
+              font-weight: 800;
+            "
+          >
+            ✓
+          </div>
+          Hoàn tất
+        </div>
+      </div>
+    </div>
+
+    <main class="container">
+      <div class="success-container">
+        <i class="fas fa-check-circle success-icon"></i>
+        <h1 class="success-title">Đặt hàng thành công!</h1>
+        <p class="success-desc">
+          Cảm ơn bạn đã mua sắm tại GoMart. Đơn hàng của bạn đã được ghi nhận và
+          đang trong quá trình xử lý.
+        </p>
+
+        <div class="order-info">
+          <p>
+            <strong>Mã đơn hàng:</strong>
+            <span id="displayOrderId">#GM-WAITING</span>
+          </p>
+          <p style="margin-top: 8px">
+            <strong>Thời gian dự kiến giao hàng:</strong> Trong vòng 2h tới
+          </p>
+          <p style="margin-top: 8px">
+            <strong>Phương thức thanh toán:</strong>
+            <span id="displayPaymentMethod">...</span>
+          </p>
+        </div>
+
+        <a href="index.html" class="btn-primary">
+          <i class="fas fa-arrow-left"></i> Tiếp tục mua sắm
+        </a>
+      </div>
+    </main>
+
+    <script>
+      // Lấy thông tin hiển thị từ LocalStorage (do trang checkout truyền sang)
+      document.addEventListener("DOMContentLoaded", function () {
+        const orderId =
+          localStorage.getItem("lastOrderId") ||
+          "#GM-" + Math.floor(Math.random() * 1000000);
+        const paymentMethod =
+          localStorage.getItem("lastPaymentMethod") ||
+          "Thanh toán khi nhận hàng";
+
+        document.getElementById("displayOrderId").innerText = orderId;
+        document.getElementById("displayPaymentMethod").innerText =
+          paymentMethod;
+
+        // Xóa thông tin tạm sau khi đã hiển thị
+        localStorage.removeItem("lastOrderId");
+        localStorage.removeItem("lastPaymentMethod");
+      });
+    </script>
+  </body>
+</html>

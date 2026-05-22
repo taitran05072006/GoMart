@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GoMart — Đăng nhập / Đăng ký</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+      /* ── Auth Page Layout ── */
+      .auth-page {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        background: #f8fdf9;
+      }
+
+      /* Left Panel — Brand */
+      .auth-brand {
+        background: linear-gradient(
+          145deg,
+          #1a7f3c 0%,
+          #1e5c2e 40%,
+          #0f3d1e 100%
+        );
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 50px;
+        position: relative;
+        overflow: hidden;
+      }
+      .auth-brand::before {
+        content: "";
+        position: absolute;
+        width: 500px;
+        height: 500px;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 50%;
+        top: -150px;
+        right: -150px;
+      }
+      .auth-brand::after {
+        content: "";
+        position: absolute;
+        width: 300px;
+        height: 300px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 50%;
+        bottom: -80px;
+        left: -80px;
+      }
+      .auth-brand__logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 48px;
+        text-decoration: none;
+      }
+      .auth-brand__logo .logo-mark {
+        width: 56px;
+        height: 56px;
+        font-size: 28px;
+        background: #fff;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        color: #1a7f3c;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      }
+      .auth-brand__logo .logo-text {
+        display: flex;
+        flex-direction: column;
+      }
+      .auth-brand__logo .logo-text > span:first-child {
+        font-size: 28px;
+        font-weight: 900;
+        color: #fff;
+        line-height: 1;
+      }
+      .auth-brand__logo .logo-text .logo-tagline {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.65);
+        margin-top: 2px;
+      }
+      .auth-brand__headline {
+        color: #fff;
+        text-align: center;
+        margin-bottom: 40px;
+        position: relative;
+        z-index: 1;
+      }
+      .auth-brand__headline h2 {
+        font-size: 34px;
+        font-weight: 800;
+        line-height: 1.25;
+        margin-bottom: 12px;
+      }
+      .auth-brand__headline p {
+        font-size: 16px;
+        opacity: 0.75;
+        line-height: 1.6;
+      }
+      .auth-perks {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        max-width: 320px;
+        position: relative;
+        z-index: 1;
+      }
+      .auth-perks li {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 500;
+        backdrop-filter: blur(8px);
+      }
+      .auth-perks li i {
+        color: #4ade80;
+        font-size: 16px;
+        width: 20px;
+      }
+      .auth-floating-emojis {
+        position: absolute;
+        bottom: 40px;
+        right: 40px;
+        font-size: 48px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        opacity: 0.2;
+      }
+
+      /* Right Panel — Form */
+      .auth-form-panel {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 32px;
+        overflow-y: auto;
+      }
+      .auth-box {
+        width: 100%;
+        max-width: 440px;
+      }
+      .auth-box__back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #555;
+        font-size: 13px;
+        text-decoration: none;
+        margin-bottom: 28px;
+        font-weight: 500;
+        transition: color 0.2s;
+      }
+      .auth-box__back:hover {
+        color: #1a7f3c;
+      }
+
+      /* Tabs */
+      .auth-tabs {
+        display: flex;
+        background: #f0f4f0;
+        border-radius: 12px;
+        padding: 4px;
+        margin-bottom: 28px;
+      }
+      .auth-tab-btn {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        background: transparent;
+        border-radius: 9px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        color: #777;
+        cursor: pointer;
+        transition: all 0.22s;
+      }
+      .auth-tab-btn.active {
+        background: #fff;
+        color: #1a7f3c;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Tab panels */
+      .auth-tab-panel {
+        display: none;
+      }
+      .auth-tab-panel.active {
+        display: block;
+      }
+
+      .auth-title {
+        font-size: 24px;
+        font-weight: 800;
+        color: #111;
+        margin-bottom: 4px;
+      }
+      .auth-subtitle {
+        font-size: 14px;
+        color: #888;
+        margin-bottom: 24px;
+      }
+
+      /* Form elements */
+      .auth-field {
+        margin-bottom: 16px;
+      }
+      .auth-field label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 6px;
+      }
+      .auth-input-wrap {
+        position: relative;
+      }
+      .auth-input-wrap i {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #aaa;
+        font-size: 14px;
+        pointer-events: none;
+      }
+      .auth-input-wrap input {
+        width: 100%;
+        padding: 12px 14px 12px 40px;
+        border: 1.5px solid #e0e6e0;
+        border-radius: 10px;
+        font-family: inherit;
+        font-size: 14px;
+        color: #111;
+        background: #fff;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+        box-sizing: border-box;
+        outline: none;
+      }
+      .auth-input-wrap input:focus {
+        border-color: #1a7f3c;
+        box-shadow: 0 0 0 3px rgba(26, 127, 60, 0.12);
+      }
+      .auth-input-wrap input.error {
+        border-color: #e53935;
+      }
+      .auth-input-wrap .toggle-pass {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #999;
+        font-size: 14px;
+        padding: 0;
+        pointer-events: all;
+      }
+      .auth-input-wrap .toggle-pass:hover {
+        color: #1a7f3c;
+      }
+
+      .auth-error {
+        font-size: 12px;
+        color: #e53935;
+        margin-top: 5px;
+        display: none;
+      }
+      .auth-error.show {
+        display: block;
+      }
+
+      .auth-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        font-size: 13px;
+      }
+      .auth-row label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        color: #555;
+      }
+      .auth-row input[type="checkbox"] {
+        accent-color: #1a7f3c;
+      }
+      .auth-row a {
+        color: #1a7f3c;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .auth-row a:hover {
+        text-decoration: underline;
+      }
+
+      .auth-submit {
+        width: 100%;
+        padding: 14px;
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #22c55e, #1a7f3c);
+        color: #fff;
+        font-family: inherit;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+        overflow: hidden;
+        letter-spacing: 0.3px;
+      }
+      .auth-submit:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(26, 127, 60, 0.35);
+      }
+      .auth-submit:active {
+        transform: translateY(0);
+      }
+      .auth-submit:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .auth-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 20px 0;
+        color: #ccc;
+        font-size: 12px;
+      }
+      .auth-divider::before,
+      .auth-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: #e8e8e8;
+      }
+
+      .auth-social {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .auth-social-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 11px;
+        border: 1.5px solid #e0e0e0;
+        border-radius: 10px;
+        background: #fff;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: #333;
+        transition: all 0.2s;
+        text-decoration: none;
+      }
+      .auth-social-btn:hover {
+        border-color: #1a7f3c;
+        background: #f0faf3;
+      }
+      .auth-social-btn .fb {
+        color: #1877f2;
+      }
+      .auth-social-btn .gg {
+        color: #ea4335;
+      }
+
+      .auth-switch {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 13.5px;
+        color: #777;
+      }
+      .auth-switch a {
+        color: #1a7f3c;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .auth-switch a:hover {
+        text-decoration: underline;
+      }
+
+      .auth-terms {
+        font-size: 12px;
+        color: #aaa;
+        text-align: center;
+        margin-top: 14px;
+        line-height: 1.6;
+      }
+      .auth-terms a {
+        color: #1a7f3c;
+      }
+
+      /* Alert box */
+      .auth-alert {
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-size: 13px;
+        margin-bottom: 16px;
+        display: none;
+        align-items: center;
+        gap: 10px;
+      }
+      .auth-alert.show {
+        display: flex;
+      }
+      .auth-alert--error {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+      }
+      .auth-alert--success {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+      }
+
+      /* Loading spinner */
+      .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .auth-page {
+          grid-template-columns: 1fr;
+        }
+        .auth-brand {
+          display: none;
+        }
+        .auth-form-panel {
+          padding: 20px 20px 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="auth-page">
+      <!-- ── Bảng trái: Thương hiệu ── -->
+      <aside class="auth-brand">
+        <a href="index.html" class="auth-brand__logo">
+          <div class="logo-mark">G</div>
+          <div class="logo-text">
+            <span
+              ><span class="logo-go">Go</span
+              ><span class="logo-mart" style="color: #4ade80">Mart</span></span
+            >
+            <span class="logo-tagline">Siêu thị mini online</span>
+          </div>
+        </a>
+
+        <div class="auth-brand__headline">
+          <h2>Mua sắm thông minh,<br />giao hàng siêu nhanh</h2>
+          <p>Hàng nghìn sản phẩm chính hãng<br />với giá tốt nhất mỗi ngày</p>
+        </div>
+
+        <ul class="auth-perks">
+          <li>
+            <i class="fas fa-truck-fast"></i> Giao hàng trong 2 giờ nội thành
+          </li>
+          <li>
+            <i class="fas fa-shield-halved"></i> Cam kết hàng chính hãng 100%
+          </li>
+          <li>
+            <i class="fas fa-rotate-left"></i> Đổi trả miễn phí trong 7 ngày
+          </li>
+          <li><i class="fas fa-tag"></i> Flash Sale giảm đến 50% mỗi ngày</li>
+        </ul>
+
+        <div class="auth-floating-emojis">
+          <span>🥦</span><span>🍅</span> <span>🥛</span><span>🛒</span>
+        </div>
+      </aside>
+
+      <!-- ── Bảng phải: Form ── -->
+      <section class="auth-form-panel">
+        <div class="auth-box">
+          <a href="index.html" class="auth-box__back">
+            <i class="fas fa-arrow-left"></i> Quay về trang chủ
+          </a>
+
+          <!-- Tab switcher -->
+          <div class="auth-tabs">
+            <button class="auth-tab-btn active" data-auth-tab="login">
+              <i class="fas fa-right-to-bracket"></i> Đăng nhập
+            </button>
+            <button class="auth-tab-btn" data-auth-tab="register">
+              <i class="fas fa-user-plus"></i> Đăng ký
+            </button>
+          </div>
+
+          <!-- ══ PANEL: Đăng nhập ══ -->
+          <div class="auth-tab-panel active" id="panel-login">
+            <div class="auth-title">Chào mừng trở lại! 👋</div>
+            <div class="auth-subtitle">Đăng nhập để tiếp tục mua sắm</div>
+
+            <div class="auth-alert auth-alert--error" id="loginError">
+              <i class="fas fa-circle-exclamation"></i>
+              <span id="loginErrorMsg"></span>
+            </div>
+
+            <div class="auth-field">
+              <label>Email</label>
+              <div class="auth-input-wrap">
+                <i class="fas fa-envelope"></i>
+                <input
+                  type="email"
+                  id="loginEmail"
+                  placeholder="email@example.com"
+                  autocomplete="email"
+                />
+              </div>
+            </div>
+
+            <div class="auth-field">
+              <label>Mật khẩu</label>
+              <div class="auth-input-wrap">
+                <i class="fas fa-lock"></i>
+                <input
+                  type="password"
+                  id="loginPassword"
+                  placeholder="Nhập mật khẩu"
+                  autocomplete="current-password"
+                />
+                <button
+                  type="button"
+                  class="toggle-pass"
+                  data-target="loginPassword"
+                >
+                  <i class="fas fa-eye-slash"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="auth-row">
+              <label
+                ><input type="checkbox" id="rememberMe" /> Ghi nhớ đăng
+                nhập</label
+              >
+              <a href="#">Quên mật khẩu?</a>
+            </div>
+
+            <button class="auth-submit" id="loginBtn" onclick="handleLogin()">
+              <i class="fas fa-right-to-bracket"></i> Đăng nhập
+            </button>
+
+            <div class="auth-divider">hoặc đăng nhập với</div>
+
+            <div class="auth-social">
+              <a
+                class="auth-social-btn"
+                href="#"
+                onclick="demoSocialLogin('Google')"
+              >
+                <i class="fab fa-google gg"></i> Google
+              </a>
+              <a
+                class="auth-social-btn"
+                href="#"
+                onclick="demoSocialLogin('Facebook')"
+              >
+                <i class="fab fa-facebook fb"></i> Facebook
+              </a>
+            </div>
+
+            <div class="auth-switch">
+              Chưa có tài khoản?
+              <a href="#" onclick="switchTab('register')">Đăng ký ngay</a>
+            </div>
+          </div>
+
+          <!-- ══ PANEL: Đăng ký ══ -->
+          <div class="auth-tab-panel" id="panel-register">
+            <div class="auth-title">Tạo tài khoản GoMart 🌟</div>
+            <div class="auth-subtitle">Đăng ký để nhận ưu đãi thành viên</div>
+
+            <div class="auth-alert auth-alert--error" id="registerError">
+              <i class="fas fa-circle-exclamation"></i>
+              <span id="registerErrorMsg"></span>
+            </div>
+            <div class="auth-alert auth-alert--success" id="registerSuccess">
+              <i class="fas fa-circle-check"></i>
+              <span>Đăng ký thành công! Đang chuyển hướng...</span>
+            </div>
+
+            <div class="auth-field">
+              <label>Họ và tên *</label>
+              <div class="auth-input-wrap">
+                <i class="fas fa-user"></i>
+                <input
+                  type="text"
+                  id="regName"
+                  placeholder="Nguyễn Văn A"
+                  autocomplete="name"
+                />
+              </div>
+              <div class="auth-error" id="regNameErr">
+                Vui lòng nhập họ và tên
+              </div>
+            </div>
+
+            <div class="auth-field">
+              <label>Email *</label>
+              <div class="auth-input-wrap">
+                <i class="fas fa-envelope"></i>
+                <input
+                  type="email"
+                  id="regEmail"
+                  placeholder="email@example.com"
+                  autocomplete="email"
+                />
+              </div>
+              <div class="auth-error" id="regEmailErr">Email không hợp lệ</div>
+            </div>
+
+            <div class="auth-field">
+              <label>Số điện thoại</label>
+              <div class="auth-input-wrap">
+                <i class="fas fa-phone"></i>
+                <input
+                  type="tel"
+                  id="regPhone"
+                  placeholder="0912 345 678"
+                  autocomplete="tel"
+                />
+              </div>
+            </div>
+
+            <div class="auth-field">
+              <label>Mật khẩu *</label>
+              <div class="auth-input-wrap">
+                <i class="fas fa-lock"></i>
+                <input
+                  type="password"
+                  id="regPassword"
+                  placeholder="Tối thiểu 6 ký tự"
+                  autocomplete="new-password"
+                />
+                <button
+                  type="button"
+                  class="toggle-pass"
+                  data-target="regPassword"
+                >
+                  <i class="fas fa-eye-slash"></i>
+                </button>
+              </div>
+              <div class="auth-error" id="regPassErr">
+                Mật khẩu tối thiểu 6 ký tự
+              </div>
+            </div>
+
+            <div class="auth-field">
+              <label>Xác nhận mật khẩu *</label>
+              <div class="auth-input-wrap">
+                <i class="fas fa-lock"></i>
+                <input
+                  type="password"
+                  id="regConfirm"
+                  placeholder="Nhập lại mật khẩu"
+                  autocomplete="new-password"
+                />
+                <button
+                  type="button"
+                  class="toggle-pass"
+                  data-target="regConfirm"
+                >
+                  <i class="fas fa-eye-slash"></i>
+                </button>
+              </div>
+              <div class="auth-error" id="regConfirmErr">
+                Mật khẩu không khớp
+              </div>
+            </div>
+
+            <button
+              class="auth-submit"
+              id="registerBtn"
+              onclick="handleRegister()"
+            >
+              <i class="fas fa-user-plus"></i> Tạo tài khoản
+            </button>
+
+            <div class="auth-terms">
+              Bằng cách đăng ký, bạn đồng ý với
+              <a href="#">Điều khoản sử dụng</a> và
+              <a href="#">Chính sách bảo mật</a> của GoMart.
+            </div>
+
+            <div class="auth-switch">
+              Đã có tài khoản?
+              <a href="#" onclick="switchTab('login')">Đăng nhập</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+      "use strict";
+
+      // Redirect nếu đã đăng nhập
+      if (isLoggedIn()) {
+        const redirect = new URLSearchParams(window.location.search).get(
+          "redirect",
+        );
+        window.location.href = redirect || "index.html";
+      }
+
+      // ── Tab switching ──────────────────────────────────────
+      function switchTab(tab) {
+        document
+          .querySelectorAll(".auth-tab-btn")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.authTab === tab),
+          );
+        document
+          .querySelectorAll(".auth-tab-panel")
+          .forEach((p) =>
+            p.classList.toggle("active", p.id === "panel-" + tab),
+          );
+      }
+
+      document.querySelectorAll(".auth-tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => switchTab(btn.dataset.authTab));
+      });
+
+      // ── Toggle password visibility ─────────────────────────
+      document.querySelectorAll(".toggle-pass").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const input = document.getElementById(btn.dataset.target);
+          const isPass = input.type === "password";
+          input.type = isPass ? "text" : "password";
+          btn.querySelector("i").className = isPass
+            ? "fas fa-eye"
+            : "fas fa-eye-slash";
+        });
+      });
+
+      // ── Đăng nhập ─────────────────────────────────────────
+      function handleLogin() {
+        const email = document.getElementById("loginEmail").value.trim();
+        const password = document.getElementById("loginPassword").value;
+        const errEl = document.getElementById("loginError");
+        const errMsg = document.getElementById("loginErrorMsg");
+
+        errEl.classList.remove("show");
+
+        if (!email || !password) {
+          errMsg.textContent = "Vui lòng nhập đầy đủ email và mật khẩu!";
+          errEl.classList.add("show");
+          return;
+        }
+
+        const btn = document.getElementById("loginBtn");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Đang đăng nhập...';
+
+        setTimeout(() => {
+          const result = loginUser(email, password);
+          if (result.success) {
+            const redirect = new URLSearchParams(window.location.search).get(
+              "redirect",
+            );
+            window.location.href = redirect || "index.html";
+          } else {
+            errMsg.textContent = result.message;
+            errEl.classList.add("show");
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Đăng nhập';
+          }
+        }, 600);
+      }
+
+      // ── Đăng ký ───────────────────────────────────────────
+      function handleRegister() {
+        const name = document.getElementById("regName").value.trim();
+        const email = document.getElementById("regEmail").value.trim();
+        const phone = document.getElementById("regPhone").value.trim();
+        const pass = document.getElementById("regPassword").value;
+        const confirm = document.getElementById("regConfirm").value;
+
+        // Reset errors
+        ["regNameErr", "regEmailErr", "regPassErr", "regConfirmErr"].forEach(
+          (id) => {
+            document.getElementById(id).classList.remove("show");
+          },
+        );
+        ["regName", "regEmail", "regPassword", "regConfirm"].forEach((id) => {
+          document.getElementById(id).classList.remove("error");
+        });
+        document.getElementById("registerError").classList.remove("show");
+
+        let valid = true;
+        if (!name) {
+          document.getElementById("regNameErr").classList.add("show");
+          document.getElementById("regName").classList.add("error");
+          valid = false;
+        }
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          document.getElementById("regEmailErr").classList.add("show");
+          document.getElementById("regEmail").classList.add("error");
+          valid = false;
+        }
+        if (!pass || pass.length < 6) {
+          document.getElementById("regPassErr").classList.add("show");
+          document.getElementById("regPassword").classList.add("error");
+          valid = false;
+        }
+        if (pass !== confirm) {
+          document.getElementById("regConfirmErr").classList.add("show");
+          document.getElementById("regConfirm").classList.add("error");
+          valid = false;
+        }
+        if (!valid) return;
+
+        const btn = document.getElementById("registerBtn");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Đang tạo tài khoản...';
+
+        setTimeout(() => {
+          const result = registerUser(name, email, pass);
+          if (result.success) {
+            document.getElementById("registerSuccess").classList.add("show");
+            setTimeout(() => (window.location.href = "index.html"), 1200);
+          } else {
+            document.getElementById("registerErrorMsg").textContent =
+              result.message;
+            document.getElementById("registerError").classList.add("show");
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-user-plus"></i> Tạo tài khoản';
+          }
+        }, 700);
+      }
+
+      // ── Enter key support ─────────────────────────────────
+      document
+        .getElementById("loginPassword")
+        .addEventListener("keydown", (e) => {
+          if (e.key === "Enter") handleLogin();
+        });
+      document.getElementById("regConfirm").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") handleRegister();
+      });
+
+      // ── Demo social login ─────────────────────────────────
+      function demoSocialLogin(provider) {
+        showToast(
+          `Tính năng đăng nhập ${provider} đang được phát triển`,
+          "⚙️",
+          "warning",
+        );
+      }
+
+      // ── Kiểm tra URL tab param ────────────────────────────
+      const tabParam = new URLSearchParams(window.location.search).get("tab");
+      if (tabParam === "register") switchTab("register");
+    </script>
+  </body>
+</html>

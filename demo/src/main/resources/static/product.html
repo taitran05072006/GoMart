@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GoMart — Chi Tiết Sản Phẩm</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="header" id="header">
+      <div class="container header__inner">
+        <a href="index.html" class="header__logo">
+          <div class="logo-mark"><span class="logo-w">G</span></div>
+          <div class="logo-text">
+            <span
+              ><span class="logo-go">Go</span
+              ><span class="logo-mart">Mart</span></span
+            >
+            <span class="logo-tagline">Siêu thị mini online</span>
+          </div>
+        </a>
+        <div class="header__search">
+          <div class="search-box">
+            <i class="fas fa-search search-icon"></i>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Tìm kiếm sản phẩm..."
+            />
+            <button class="search-btn">
+              <i class="fas fa-search"></i> Tìm
+            </button>
+          </div>
+          <div class="search-suggestions" id="searchSuggestions"></div>
+        </div>
+        <div class="header__actions">
+          <a href="#" class="action-btn">
+            <div class="action-icon">
+              <i class="fas fa-heart"></i
+              ><span class="wishlist-badge badge">0</span>
+            </div>
+            <span class="action-label">Yêu thích</span>
+          </a>
+          <a href="#" class="action-btn" id="cartBtn">
+            <div class="action-icon">
+              <i class="fas fa-cart-shopping"></i
+              ><span class="cart-badge badge">0</span>
+            </div>
+            <span class="action-label">Giỏ hàng</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <nav class="navbar">
+      <div class="container navbar__inner">
+        <button class="navbar__menu-btn" id="categoryToggle">
+          <i class="fas fa-bars-staggered"></i> Danh mục
+        </button>
+        <ul class="navbar__links">
+          <li><a href="index.html">Trang chủ</a></li>
+          <li><a href="category.html">Tất cả sản phẩm</a></li>
+        </ul>
+      </div>
+      <div class="category-dropdown" id="categoryDropdown">
+        <div class="container">
+          <ul class="cat-list">
+            <li>
+              <a href="category.html?cat=fresh"
+                ><i class="fas fa-fish"></i> Thực phẩm tươi</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=dairy"
+                ><i class="fas fa-egg"></i> Sữa & Trứng</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=drink"
+                ><i class="fas fa-bottle-water"></i> Đồ uống</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=snack"
+                ><i class="fas fa-cookie-bite"></i> Bánh & Snack</a
+              >
+            </li>
+            <li>
+              <a href="category.html?cat=vegetable"
+                ><i class="fas fa-carrot"></i> Rau củ quả</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="breadcrumb-wrap">
+      <div class="container">
+        <ul class="breadcrumb">
+          <li><a href="index.html">Trang chủ</a></li>
+          <li><i class="fas fa-chevron-right"></i></li>
+          <li><a href="category.html">Sản phẩm</a></li>
+          <li><i class="fas fa-chevron-right"></i></li>
+          <li class="active">Chi tiết sản phẩm</li>
+        </ul>
+      </div>
+    </div>
+
+    <main class="product-page">
+      <div class="container">
+        <div class="product-detail-main">
+          <!-- Gallery -->
+          <div class="pd-gallery">
+            <div class="pd-main-img" id="mainImage">
+              <span class="pd-emoji">🐟</span>
+              <span class="pd-badge">-17%</span>
+            </div>
+            <div class="pd-thumbnails">
+              <div
+                class="pd-thumb active"
+                data-emoji="🐟"
+                style="background: #e3f2fd"
+              >
+                <span>🐟</span>
+              </div>
+              <div class="pd-thumb" data-emoji="📦" style="background: #f5f5f5">
+                <span>📦</span>
+              </div>
+              <div class="pd-thumb" data-emoji="🏷️" style="background: #fff9c4">
+                <span>🏷️</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Info -->
+          <div class="pd-info">
+            <h1 class="pd-title">Đang tải...</h1>
+            <div class="pd-meta">
+              <div class="pd-rating">
+                <span class="stars"></span>
+                <span class="pd-reviews"></span>
+              </div>
+              <div style="font-size: 13px; color: var(--gray-400)">|</div>
+              <div style="font-size: 13px; color: var(--gray-500)">
+                <i class="fas fa-check-circle" style="color: var(--green)"></i>
+                Còn hàng
+              </div>
+            </div>
+            <div class="pd-price-box">
+              <span class="pd-price-current"></span>
+              <span class="pd-price-old"></span>
+            </div>
+            <ul class="pd-highlights"></ul>
+
+            <!-- Delivery info -->
+            <div
+              style="
+                background: var(--green-pale);
+                border-radius: 10px;
+                padding: 12px 14px;
+                margin: 14px 0;
+                border: 1px solid var(--green-light);
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  font-size: 13.5px;
+                  color: var(--gray-700);
+                  margin-bottom: 6px;
+                "
+              >
+                <i class="fas fa-truck-fast" style="color: var(--green)"></i>
+                <strong>Giao hàng nhanh</strong> — Nhận trong 2 giờ
+              </div>
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  font-size: 13.5px;
+                  color: var(--gray-700);
+                "
+              >
+                <i class="fas fa-shield-halved" style="color: var(--green)"></i>
+                <strong>Cam kết</strong> hàng tươi, hoàn tiền nếu không đạt
+              </div>
+            </div>
+
+            <div class="pd-actions">
+              <div
+                style="
+                  font-size: 13.5px;
+                  font-weight: 700;
+                  margin-bottom: 8px;
+                  color: var(--gray-700);
+                "
+              >
+                Số lượng:
+              </div>
+              <div class="pd-qty-selector">
+                <button class="pd-qty-btn" id="pdDec">−</button>
+                <input
+                  type="number"
+                  class="pd-qty-input"
+                  id="pdQty"
+                  value="1"
+                  min="1"
+                />
+                <button class="pd-qty-btn" id="pdInc">+</button>
+              </div>
+            </div>
+            <div class="pd-buttons">
+              <button class="pd-btn-add" data-add="7">
+                <i class="fas fa-cart-plus"></i> Thêm vào giỏ
+              </button>
+              <button class="pd-btn-buy checkout-btn">
+                <i class="fas fa-bolt"></i> Mua ngay
+              </button>
+              <button class="pd-btn-wish" data-wish="7">
+                <i class="far fa-heart"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="product-tabs-section">
+          <div class="pd-tab-headers">
+            <button class="pd-tab-btn active" data-target="tab-desc">
+              Mô tả sản phẩm
+            </button>
+            <button class="pd-tab-btn" data-target="tab-review">
+              Đánh giá
+            </button>
+            <button class="pd-tab-btn" data-target="tab-ship">
+              Vận chuyển & Đổi trả
+            </button>
+          </div>
+          <div class="pd-tab-content active" id="tab-desc">
+            <h3 style="margin-bottom: 10px; font-size: 16px">
+              Thông tin sản phẩm
+            </h3>
+            <p>Đang tải thông tin sản phẩm...</p>
+          </div>
+          <div class="pd-tab-content" id="tab-review">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 30px;
+                margin-bottom: 20px;
+                padding: 20px;
+                background: var(--gray-50);
+                border-radius: 12px;
+              "
+            >
+              <div style="text-align: center">
+                <div
+                  style="
+                    font-size: 48px;
+                    font-weight: 800;
+                    color: var(--green);
+                    line-height: 1;
+                  "
+                >
+                  4.8
+                </div>
+                <div
+                  style="color: var(--yellow); font-size: 16px; margin: 4px 0"
+                >
+                  ★★★★★
+                </div>
+                <div style="font-size: 13px; color: var(--gray-500)">
+                  789 đánh giá
+                </div>
+              </div>
+              <div style="flex: 1">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 6px;
+                    font-size: 13px;
+                  "
+                >
+                  <span style="width: 30px; text-align: right">5⭐</span>
+                  <div
+                    style="
+                      flex: 1;
+                      height: 8px;
+                      background: var(--gray-200);
+                      border-radius: 4px;
+                      overflow: hidden;
+                    "
+                  >
+                    <div
+                      style="
+                        width: 70%;
+                        height: 100%;
+                        background: var(--yellow);
+                        border-radius: 4px;
+                      "
+                    ></div>
+                  </div>
+                  <span style="color: var(--gray-500); width: 30px">70%</span>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 6px;
+                    font-size: 13px;
+                  "
+                >
+                  <span style="width: 30px; text-align: right">4⭐</span>
+                  <div
+                    style="
+                      flex: 1;
+                      height: 8px;
+                      background: var(--gray-200);
+                      border-radius: 4px;
+                      overflow: hidden;
+                    "
+                  >
+                    <div
+                      style="
+                        width: 20%;
+                        height: 100%;
+                        background: var(--yellow);
+                        border-radius: 4px;
+                      "
+                    ></div>
+                  </div>
+                  <span style="color: var(--gray-500); width: 30px">20%</span>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 13px;
+                  "
+                >
+                  <span style="width: 30px; text-align: right">≤3⭐</span>
+                  <div
+                    style="
+                      flex: 1;
+                      height: 8px;
+                      background: var(--gray-200);
+                      border-radius: 4px;
+                      overflow: hidden;
+                    "
+                  >
+                    <div
+                      style="
+                        width: 10%;
+                        height: 100%;
+                        background: var(--gray-300);
+                        border-radius: 4px;
+                      "
+                    ></div>
+                  </div>
+                  <span style="color: var(--gray-500); width: 30px">10%</span>
+                </div>
+              </div>
+            </div>
+            <p style="color: var(--gray-500); font-size: 14px">
+              Tính năng đánh giá sẽ được cập nhật sớm...
+            </p>
+          </div>
+          <div class="pd-tab-content" id="tab-ship">
+            <div style="display: flex; flex-direction: column; gap: 14px">
+              <div style="display: flex; gap: 12px; align-items: flex-start">
+                <i
+                  class="fas fa-truck-fast"
+                  style="color: var(--green); font-size: 18px; margin-top: 2px"
+                ></i>
+                <div>
+                  <strong>Giao hàng nhanh 2 giờ</strong> nội thành TP.HCM, Hà
+                  Nội, Đà Nẵng.<br /><span
+                    style="font-size: 13px; color: var(--gray-500)"
+                    >Freeship đơn từ 200.000đ. Phí ship 30.000đ cho đơn
+                    dưới.</span
+                  >
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: flex-start">
+                <i
+                  class="fas fa-rotate-left"
+                  style="color: var(--green); font-size: 18px; margin-top: 2px"
+                ></i>
+                <div>
+                  <strong>Đổi trả miễn phí trong 7 ngày</strong> nếu sản phẩm
+                  không đạt chất lượng.<br /><span
+                    style="font-size: 13px; color: var(--gray-500)"
+                    >Liên hệ hotline 1800 1234 để được hỗ trợ.</span
+                  >
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: flex-start">
+                <i
+                  class="fas fa-shield-halved"
+                  style="color: var(--green); font-size: 18px; margin-top: 2px"
+                ></i>
+                <div>
+                  <strong>Cam kết hàng chính hãng 100%</strong>. Hoàn tiền 100%
+                  nếu hàng giả.<br />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Related Products -->
+        <div class="related-section">
+          <div
+            class="section-header"
+            style="margin-top: 30px; margin-bottom: 16px"
+          >
+            <h2 class="section-title">Sản phẩm liên quan</h2>
+          </div>
+          <div id="relatedGrid"></div>
+        </div>
+      </div>
+    </main>
+
+    <div class="cart-overlay" id="cartOverlay"></div>
+    <div class="cart-sidebar" id="cartSidebar">
+      <div class="cart-sidebar__header">
+        <h3><i class="fas fa-cart-shopping"></i> Giỏ hàng của bạn</h3>
+        <button class="cart-close" id="cartClose">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div id="freeShipBar"></div>
+      <div class="cart-sidebar__body" id="cartItems"></div>
+      <div class="cart-sidebar__footer" id="cartFooter" style="display: none">
+        <div class="cart-totals-row">
+          <span>Tạm tính:</span><span id="cartSubtotal">0đ</span>
+        </div>
+        <div class="cart-totals-row">
+          <span>Phí vận chuyển:</span><span id="cartShipping">30.000đ</span>
+        </div>
+        <div class="cart-total">
+          <span>Tổng cộng:</span><strong id="cartTotal">0đ</strong>
+        </div>
+        <button class="checkout-btn btn-checkout">
+          <i class="fas fa-lock"></i> Thanh toán an toàn
+        </button>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/cart.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+  </body>
+</html>
