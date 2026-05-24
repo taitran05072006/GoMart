@@ -14,6 +14,7 @@ import java.util.List;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByCategory(Category category);
+    List<Product> findByCategoryAndIsDeletedFalse(Category category);
     @Query("""
 SELECT p FROM Product p
 WHERE (:keyword IS NULL OR
@@ -49,4 +50,28 @@ AND (:maxPrice IS NULL OR p.price <= :maxPrice)
     @Query(value = "UPDATE products SET version = 0 WHERE version IS NULL", nativeQuery = true)
     int normalizeNullVersions();
 
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE products SET is_deleted = false WHERE is_deleted IS NULL", nativeQuery = true)
+    int normalizeNullDeleted();
+
+    @Transactional
+    @Modifying
+    @Query(value = "DELETE FROM product_units WHERE product_id = :productId", nativeQuery = true)
+    void deleteProductUnitsByProductId(@Param("productId") Long productId);
+
+    @Transactional
+    @Modifying
+    @Query(value = "DELETE FROM cart_items WHERE product_id = :productId", nativeQuery = true)
+    void deleteCartItemsByProductId(@Param("productId") Long productId);
+
+    @Transactional
+    @Modifying
+    @Query(value = "DELETE FROM stock_receipt_items WHERE product_id = :productId", nativeQuery = true)
+    void deleteStockReceiptItemsByProductId(@Param("productId") Long productId);
+
+    @Transactional
+    @Modifying
+    @Query(value = "DELETE FROM order_items WHERE product_id = :productId", nativeQuery = true)
+    void deleteOrderItemsByProductId(@Param("productId") Long productId);
 }

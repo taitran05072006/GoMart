@@ -74,8 +74,8 @@ public class OrderService {
                 .starsAwarded(order.getStarsAwarded())
                 .items(order.getItems() != null ? order.getItems().stream()
                         .map(item -> OrderItemResponseDto.builder()
-                                .Productid(item.getProduct().getId())
-                                .productName(item.getProduct().getName())
+                                .Productid(item.getProduct() != null ? item.getProduct().getId() : null)
+                                .productName(item.getProduct() != null ? item.getProduct().getName() : "Sản phẩm đã bị xóa")
                                 .quantity(item.getQuantity())
                                 .price(item.getPrice())
                                 .unit(item.getUnit())
@@ -297,10 +297,11 @@ public class OrderService {
 
         // Deduct stars from user
         if (order.getStarsUsed() != null && order.getStarsUsed() > 0) {
-            if (user.getRewardStars() < order.getStarsUsed()) {
+            int userStars = user.getRewardStars() != null ? user.getRewardStars() : 0;
+            if (userStars < order.getStarsUsed()) {
                 throw new BadRequestException("Bạn không đủ sao để sử dụng");
             }
-            user.setRewardStars(user.getRewardStars() - order.getStarsUsed());
+            user.setRewardStars(userStars - order.getStarsUsed());
             userRepository.save(user);
         }
 
@@ -342,7 +343,8 @@ public class OrderService {
 
         // Clean up cart
         List<Long> orderedProductIds = items.stream()
-                .map(i -> i.getProduct().getId())
+                .map(i -> i.getProduct() != null ? i.getProduct().getId() : null)
+                .filter(java.util.Objects::nonNull)
                 .toList();
 
         Cart cart = cartRepository.findByUserId(dto.getUserId());
@@ -601,7 +603,8 @@ public class OrderService {
             case COMPLETED:
                 if (order.getStarsAwarded() != null && order.getStarsAwarded() > 0) {
                     User customer = order.getUser();
-                    customer.setRewardStars(customer.getRewardStars() + order.getStarsAwarded());
+                    int currentStars = customer.getRewardStars() != null ? customer.getRewardStars() : 0;
+                    customer.setRewardStars(currentStars + order.getStarsAwarded());
                     userRepository.save(customer);
                     log.info("Đã tặng {} sao cho người dùng {}", order.getStarsAwarded(), customer.getEmail());
                 }

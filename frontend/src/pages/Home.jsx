@@ -197,7 +197,11 @@ const Home = () => {
                                     onClick={() => {
                                         if (isUsed) return;
                                         if (isCollected) {
-                                            navigate("/cart");
+                                            if (v.applicableProductIds && v.applicableProductIds.length > 0) {
+                                                navigate(`/voucher/${v.code}`);
+                                            } else {
+                                                navigate("/cart");
+                                            }
                                         }
                                     }}
                                 >
@@ -243,7 +247,11 @@ const Home = () => {
                                                     e.stopPropagation();
                                                     if (isUsed) return;
                                                     if (isCollected) {
-                                                        navigate("/cart");
+                                                        if (v.applicableProductIds && v.applicableProductIds.length > 0) {
+                                                            navigate(`/voucher/${v.code}`);
+                                                        } else {
+                                                            navigate("/cart");
+                                                        }
                                                         return;
                                                     }
                                                     const res = await collectVoucher(user?.id, v.code);

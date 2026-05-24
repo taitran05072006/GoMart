@@ -11,3 +11,9 @@ target/
 
 # OS
 .DS_Store
+
+# Scratch files and backups
+test_db.py
+*.sql
+frontend/.env
+frontend/dist/

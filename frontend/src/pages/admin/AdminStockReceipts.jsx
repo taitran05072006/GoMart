@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Package } from 'lucide-react';
 import stockReceiptService from '../../services/StockReceipt';
 
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
@@ -147,24 +147,28 @@ const AdminStockReceipts = () => {
                   <tr>
                     <th className="px-4 py-2 text-left">Sản phẩm</th>
                     <th className="px-4 py-2 text-center">Số lượng</th>
-                    <th className="px-4 py-2 text-right">Giá nhập</th>
+                    <th className="px-4 py-2 text-right">Đơn giá</th>
+                    <th className="px-4 py-2 text-right">Thành tiền</th>
                     <th className="px-4 py-2 text-center">NSX</th>
                     <th className="px-4 py-2 text-center">HSD</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {viewingReceipt.items?.map((item) => (
-                    <tr key={item.id}>
+                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <img src={item.product?.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover" />
-                          <span className="font-semibold text-slate-900">{item.product?.name}</span>
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                            <Package size={20} />
+                          </div>
+                          <span className="font-semibold text-slate-900">{item.productName}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center text-slate-700">
-                        {item.quantity} {item.unit || ''}
+                      <td className="px-4 py-3 text-center text-slate-700 font-medium">
+                        {item.quantity}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900">{currency.format(item.price)}</td>
+                      <td className="px-4 py-3 text-right text-slate-600">{currency.format(item.price)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-900">{currency.format(item.totalPrice || (item.quantity * item.price))}</td>
                       <td className="px-4 py-3 text-center text-slate-500">{item.manufactureDate || '-'}</td>
                       <td className="px-4 py-3 text-center text-slate-500">{item.expiryDate || '-'}</td>
                     </tr>

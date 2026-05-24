@@ -39,6 +39,8 @@ public class CategoryService {
                 .name(dto.getName())
                 .icon(dto.getIcon())
                 .expiryThresholdDays(dto.getExpiryThresholdDays())
+                .isDeleted(false)
+                .isActive(true)
                 .build();
         categoryRepository.save(category);
         return mapToDto(category);

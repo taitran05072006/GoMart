@@ -50,6 +50,7 @@ public class Product {
     @Builder.Default
     private Long version = 0L;
 
+    @Builder.Default
     private Boolean isDeleted = false;// đánh dấu sản phẩm đã bị xóa (soft delete)
 
     @PrePersist

@@ -109,14 +109,14 @@ const AdminProductForm = () => {
       const numValue = Number(value) || 0;
       const currentOldPrice = name === 'oldPrice' ? numValue : (Number(form.oldPrice) || 0);
       const currentDiscount = name === 'discount' ? numValue : (Number(form.discount) || 0);
-      
+
       // price = oldPrice * (1 - discount/100)
       const calculatedPrice = Math.round(currentOldPrice * (1 - currentDiscount / 100));
-      
-      setForm(prev => ({ 
-        ...prev, 
-        [name]: value, 
-        price: calculatedPrice 
+
+      setForm(prev => ({
+        ...prev,
+        [name]: value,
+        price: calculatedPrice
       }));
     } else {
       setForm((current) => ({ ...current, [name]: value }));
@@ -196,19 +196,10 @@ const AdminProductForm = () => {
               </option>
             ))}
           </Field>
-          <Field label="Giá gốc (VNĐ) *" name="oldPrice" type="number" min="0" value={form.oldPrice} onChange={handleChange} required />
-          <Field 
-            label="Giá bán (Tự động tính)" 
-            name="price" 
-            type="number" 
-            value={form.price} 
-            disabled 
-            className="bg-slate-50 font-bold text-slate-900"
-          />
+          <Field label="Giá (VNĐ) *" name="oldPrice" type="number" min="0" value={form.oldPrice} onChange={handleChange} required />
+
           <Field label="Đơn vị tính" name="unit" value={form.unit} onChange={handleChange} placeholder="vd: kg, hộp, cái..." />
 
-
-          <Field label="Nhãn (Tag)" name="tag" value={form.tag} onChange={handleChange} placeholder="vd: hot, new, sale..." />
         </div>
 
         <div className="lg:col-span-2 grid gap-4 lg:grid-cols-2 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
@@ -224,7 +215,6 @@ const AdminProductForm = () => {
               required
               className="font-bold text-blue-600 text-lg bg-blue-50/30"
             />
-            <p className="text-[10px] text-slate-500 italic">* Phải bằng Lô cũ + Lô mới</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">

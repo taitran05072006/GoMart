@@ -44,7 +44,7 @@ public class ProductService {
 
     public List<ProductResponseDto> getByCategory(Long categoryId) {
         Category category = categoryRepository.findById(categoryId).orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục"));
-        return productRepository.findByCategory(category).stream()
+        return productRepository.findByCategoryAndIsDeletedFalse(category).stream()
                 .map(this::mapTo)
                 .collect(Collectors.toList());
     }
@@ -71,6 +71,7 @@ public class ProductService {
                 .expiryDate(dto.getExpiryDate())
                 .description(dto.getDescription())
                 .category(category)
+                .isDeleted(false)
                 .build();
         productRepository.save(product);
 
@@ -152,11 +153,19 @@ public class ProductService {
     }
 
     // ================= DELETE =================
+    @Transactional
     public void delete(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm"));
-        product.setIsDeleted(true);
-        productRepository.save(product);
+        
+        // 1. Delete all referencing rows in child tables using native queries
+        productRepository.deleteProductUnitsByProductId(id);
+        productRepository.deleteCartItemsByProductId(id);
+        productRepository.deleteStockReceiptItemsByProductId(id);
+        productRepository.deleteOrderItemsByProductId(id);
+        
+        // 2. Delete the product itself
+        productRepository.delete(product);
     }
     public List<ProductResponseDto> filterProducts(
             Long categoryId,

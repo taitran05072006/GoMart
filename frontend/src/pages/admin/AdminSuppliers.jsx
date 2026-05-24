@@ -151,8 +151,8 @@ const AdminSuppliers = () => {
                     <tr key={supplier.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 text-sm text-gray-600">#{supplier.id}</td>
                       <td className="px-6 py-4 font-medium text-gray-900">{supplier.name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{supplier.phone || '-'}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{supplier.email || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 max-w-[150px] truncate" title={supplier.phone}>{supplier.phone || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 max-w-[180px] truncate" title={supplier.email}>{supplier.email || '-'}</td>
                       <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">{supplier.address || '-'}</td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${

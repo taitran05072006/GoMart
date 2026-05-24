@@ -26,18 +26,18 @@ const Sidebar = ({ onCategorySelect, selectedCategory }) => {
   }, [categories, search]);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 h-full">
+    <div className="bg-transparent md:bg-white rounded-xl md:shadow-sm md:border md:border-gray-100 p-0 md:p-4 h-full">
 
       {/* Header */}
-      <h3 className="font-bold text-gray-800 uppercase tracking-wider mb-3 border-b pb-2">
+      <h3 className="font-bold text-gray-800 uppercase tracking-wider mb-3 border-b pb-2 hidden md:block">
         Danh Mục
       </h3>
 
       {/* Loading */}
       {loading && (
-        <div className="space-y-2">
+        <div className="flex flex-row md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0">
           {[1,2,3,4].map(i => (
-            <div key={i} className="h-8 bg-gray-100 animate-pulse rounded-lg" />
+            <div key={i} className="h-9 w-24 md:w-full bg-slate-100 animate-pulse rounded-xl flex-shrink-0" />
           ))}
         </div>
       )}
@@ -49,31 +49,35 @@ const Sidebar = ({ onCategorySelect, selectedCategory }) => {
 
       {/* List */}
       {!loading && !error && (
-        <ul className="space-y-1">
+        <ul className="flex flex-row md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0 md:overflow-visible md:space-y-1 scrollbar-none">
 
           {/* All products */}
-          <li>
+          <li className="flex-shrink-0">
             <button
               onClick={() => onCategorySelect(null)}
-              className={`w-full text-left px-3 py-2 rounded-lg transition ${
+              className={`w-full text-left px-4 py-2 md:px-3 md:py-2 rounded-xl transition whitespace-nowrap text-sm font-semibold ${
                 !selectedCategory
-                  ? 'bg-brand-50 text-brand-600 font-medium'
-                  : 'hover:bg-gray-50 text-gray-600'
+                  ? 'bg-brand-600 text-white font-black shadow-md shadow-brand-100'
+                  : 'bg-white border border-slate-100 text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+              } md:bg-transparent md:border-none md:shadow-none md:hover:bg-gray-50 md:text-gray-600 md:w-full md:rounded-lg ${
+                !selectedCategory && 'md:bg-brand-50 md:text-brand-600 md:font-medium'
               }`}
             >
-            Sản phẩm
+              Tất cả
             </button>
           </li>
 
           {/* Categories */}
           {filteredCategories.map(cat => (
-            <li key={cat.id}>
+            <li key={cat.id} className="flex-shrink-0">
               <button
                 onClick={() => onCategorySelect(cat.id)}
-                className={`w-full text-left px-3 py-2 rounded-lg transition ${
+                className={`w-full text-left px-4 py-2 md:px-3 md:py-2 rounded-xl transition whitespace-nowrap text-sm font-semibold ${
                   selectedCategory === cat.id
-                    ? 'bg-brand-50 text-brand-600 font-medium'
-                    : 'hover:bg-gray-50 text-gray-600'
+                    ? 'bg-brand-600 text-white font-black shadow-md shadow-brand-100'
+                    : 'bg-white border border-slate-100 text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                } md:bg-transparent md:border-none md:shadow-none md:hover:bg-gray-50 md:text-gray-600 md:w-full md:rounded-lg ${
+                  selectedCategory === cat.id && 'md:bg-brand-50 md:text-brand-600 md:font-medium'
                 }`}
               >
                 {cat.name}

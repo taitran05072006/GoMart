@@ -22,7 +22,9 @@ public class Category {
     private Long id;
     private String name;
     private String icon;
+    @Builder.Default
     private Boolean isDeleted = false;
+    @Builder.Default
     private Boolean isActive = true;
     private Integer expiryThresholdDays;
 }

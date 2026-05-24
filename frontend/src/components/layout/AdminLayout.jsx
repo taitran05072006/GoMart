@@ -155,7 +155,7 @@ const AdminLayout = () => {
           </button>
         </aside>
 
-        <section className="p-4 sm:p-6 xl:p-8">
+        <section className="p-4 sm:p-6 xl:p-8 min-w-0">
           <div className="min-h-[calc(100vh-64px)] rounded-[28px] border border-slate-200 bg-white p-4 shadow-xl shadow-slate-200/40 sm:p-6 xl:p-8">
             <Outlet />
           </div>

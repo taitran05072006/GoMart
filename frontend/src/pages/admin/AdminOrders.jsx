@@ -270,14 +270,8 @@ const AdminOrders = () => {
           )}
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
-            <Download size={18} />
-            Xuất Excel
-          </button>
-          <button className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 transition-all shadow-lg shadow-blue-200">
-            <Plus size={18} />
-            Tạo đơn hàng
-          </button>
+        
+
         </div>
       </div>
 

@@ -105,14 +105,28 @@ const AdminStockReceiptForm = () => {
       supplierId: Number(form.supplierId),
       supplier: form.supplierName.trim(),
       note: form.note.trim(),
-      items: form.items.map((item) => ({
-        productId: Number(item.productId),
-        quantity: Number(item.quantity),
-        price: Number(item.price),
-        unit: item.unit,
-        manufactureDate: item.manufactureDate,
-        expiryDate: item.expiryDate,
-      })),
+      items: form.items.map((item) => {
+        const product = allProducts.find(p => p.id === item.productId);
+        let finalQuantity = Number(item.quantity);
+        let finalPrice = Number(item.price);
+        
+        if (product) {
+          const selectedUnit = product.units?.find(u => u.name === item.unit);
+          if (selectedUnit && selectedUnit.conversionRate > 0) {
+            finalQuantity = Number(item.quantity) * selectedUnit.conversionRate;
+            finalPrice = Number(item.price) / selectedUnit.conversionRate;
+          }
+        }
+        
+        return {
+          productId: Number(item.productId),
+          quantity: finalQuantity,
+          price: finalPrice,
+          unit: product ? (product.unit || 'chai') : item.unit,
+          manufactureDate: item.manufactureDate,
+          expiryDate: item.expiryDate,
+        };
+      }),
     };
 
     try {
@@ -195,7 +209,7 @@ const AdminStockReceiptForm = () => {
 
           <div className="space-y-3">
             {form.items.map((item, index) => (
-              <div key={index} className="grid gap-3 rounded-xl border border-slate-200 p-3 lg:grid-cols-[1.5fr_0.8fr_0.8fr_1fr_1.2fr_1.2fr_auto]">
+              <div key={index} className="grid gap-3 rounded-xl border border-slate-200 p-3 lg:grid-cols-[1.5fr_0.8fr_0.8fr_1fr_1.1fr_1.1fr_1.1fr_auto] items-start">
                 <div className="relative">
                   <label className="mb-2 block text-sm font-semibold text-slate-700">Sản phẩm *</label>
                   <input
@@ -209,7 +223,7 @@ const AdminStockReceiptForm = () => {
                       setProductSuggestionsIndex(index);
                     }}
                     onFocus={() => setProductSuggestionsIndex(index)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
                   />
                   {productSuggestionsIndex === index && item.productName && (
                     <div className="absolute z-10 w-full mt-1 bg-white border rounded-xl shadow-lg max-h-40 overflow-y-auto">
@@ -230,28 +244,103 @@ const AdminStockReceiptForm = () => {
                     </div>
                   )}
                 </div>
-                <Field
-                  label="Đơn vị"
-                  value={item.unit}
-                  onChange={(event) => handleItemChange(index, 'unit', event.target.value)}
-                  required
-                />
-                <Field
-                  label="Số lượng"
-                  type="number"
-                  min="1"
-                  value={item.quantity}
-                  onChange={(event) => handleItemChange(index, 'quantity', event.target.value)}
-                  required
-                />
-                <Field
-                  label="Giá nhập"
-                  type="number"
-                  min="1"
-                  value={item.price}
-                  onChange={(event) => handleItemChange(index, 'price', event.target.value)}
-                  required
-                />
+                {/* Đơn vị */}
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Đơn vị *</label>
+                  {(() => {
+                    const product = allProducts.find(p => p.id === item.productId);
+                    if (product) {
+                      const baseUnit = product.unit || 'chai';
+                      const extraUnits = product.units || [];
+                      return (
+                        <select
+                          value={item.unit || baseUnit}
+                          onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100 bg-white"
+                        >
+                          <option value={baseUnit}>{baseUnit} (Gốc)</option>
+                          {extraUnits.map(u => (
+                            <option key={u.name} value={u.name}>{u.name} (x{u.conversionRate})</option>
+                          ))}
+                        </select>
+                      );
+                    } else {
+                      return (
+                        <select
+                          disabled
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-400 outline-none"
+                        >
+                          <option>Chọn sản phẩm...</option>
+                        </select>
+                      );
+                    }
+                  })()}
+                </div>
+
+                {/* Số lượng */}
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Số lượng {item.unit ? `(${item.unit})` : ''} *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={item.quantity}
+                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+                    required
+                  />
+                  {(() => {
+                    const product = allProducts.find(p => p.id === item.productId);
+                    if (product) {
+                      const selectedUnit = product.units?.find(u => u.name === item.unit);
+                      if (selectedUnit && selectedUnit.conversionRate > 1) {
+                        const baseQuantity = Number(item.quantity || 0) * selectedUnit.conversionRate;
+                        return (
+                          <p className="mt-1 text-[11px] font-bold text-amber-600">
+                            (= {baseQuantity} {product.unit || 'chai'})
+                          </p>
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
+                </div>
+
+                {/* Giá nhập */}
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Giá nhập {item.unit ? `(${item.unit})` : ''} *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={item.price}
+                    onChange={(e) => handleItemChange(index, 'price', e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+                    required
+                  />
+                  {(() => {
+                    const product = allProducts.find(p => p.id === item.productId);
+                    if (product) {
+                      const selectedUnit = product.units?.find(u => u.name === item.unit);
+                      if (selectedUnit && selectedUnit.conversionRate > 1) {
+                        const basePrice = Number(item.price || 0) / selectedUnit.conversionRate;
+                        return (
+                          <p className="mt-1 text-[11px] font-bold text-slate-500">
+                            (= {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(basePrice)} / {product.unit || 'chai'})
+                          </p>
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
+                </div>
+
+                {/* Thành tiền */}
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Thành tiền {item.unit ? `(${item.unit})` : ''}</label>
+                  <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 h-[46px] flex items-center justify-start truncate">
+                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(item.quantity || 0) * Number(item.price || 0))}
+                  </div>
+                </div>
+
                 <Field
                   label="NSX"
                   type="date"
@@ -266,11 +355,12 @@ const AdminStockReceiptForm = () => {
                   onChange={(event) => handleItemChange(index, 'expiryDate', event.target.value)}
                   required
                 />
-                <div className="flex items-end">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-transparent select-none">Hành động</label>
                   <button
                     type="button"
                     onClick={() => removeItem(index)}
-                    className="rounded-full border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                    className="h-[46px] w-full flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-100 transition whitespace-nowrap"
                   >
                     Hủy bỏ
                   </button>

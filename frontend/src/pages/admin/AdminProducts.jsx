@@ -120,7 +120,7 @@ const AdminProducts = () => {
                     </div>
                   </td>
                   <td className="px-5 py-4 text-slate-600">{product.category || 'Uncategorized'}</td>
-                  <td className="px-5 py-4 text-center font-semibold text-slate-900">{currency.format(Number(product.price || 0))}</td>
+                  <td className="px-5 py-4 text-center font-semibold text-slate-900">{currency.format(Number(product.oldPrice || 0))}</td>
                   <td className="px-5 py-4 text-center">
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${Number(product.stock || 0) > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                       {Number(product.stock || 0) > 0 ? `${product.stock}` : 'Hết hàng'}
