@@ -13,6 +13,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -60,6 +62,8 @@ public class User {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<Order> orders;
     public boolean isAdmin() {
         return role == Role.ADMIN;

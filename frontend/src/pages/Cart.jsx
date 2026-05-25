@@ -97,8 +97,8 @@ const Cart = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <button 
-        onClick={handleBack} 
+      <button
+        onClick={handleBack}
         className="flex items-center gap-2 text-slate-500 hover:text-black mb-6 font-bold transition-all group"
       >
         <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
@@ -171,7 +171,7 @@ const Cart = () => {
                           {item.productName}
                         </p>
                       </Link>
-                      
+
                       <div className="flex flex-col gap-2 mt-1">
                         <div className="flex items-center gap-2 relative">
                           <button
@@ -183,7 +183,7 @@ const Cart = () => {
                             }}
                             className="flex items-center gap-1 text-[10px] font-black bg-slate-100 text-slate-600 px-2 py-1 rounded uppercase hover:bg-slate-200 transition-colors group border border-slate-200"
                           >
-                            Phân loại: {item.unit || item.availableUnits?.[0]?.name}
+                            {item.unit || item.availableUnits?.[0]?.name}
                             <span className="text-slate-400 group-hover:text-slate-600">▼</span>
                           </button>
                           <p className="text-sm text-gray-500">
@@ -193,8 +193,8 @@ const Cart = () => {
                           {/* Unit Selector Popover */}
                           {editingUnitItem?.id === item.id && (
                             <>
-                              <div 
-                                className="fixed inset-0 z-40" 
+                              <div
+                                className="fixed inset-0 z-40"
                                 onClick={() => setEditingUnitItem(null)}
                               />
                               <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-slate-200 shadow-2xl rounded-2xl p-4 w-64 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -212,8 +212,8 @@ const Cart = () => {
                                         setEditingUnitItem(null);
                                       }}
                                       className={`flex flex-col p-3 rounded-xl border-2 transition-all text-left ${
-                                        item.unit === u.name 
-                                        ? 'border-blue-500 bg-blue-50/50' 
+                                        item.unit === u.name
+                                        ? 'border-blue-500 bg-blue-50/50'
                                         : 'border-slate-50 hover:border-slate-200 hover:bg-slate-50'
                                       }`}
                                     >

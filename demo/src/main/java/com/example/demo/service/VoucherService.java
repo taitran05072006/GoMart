@@ -360,6 +360,31 @@ public class VoucherService {
         voucherRepository.save(voucher);
     }
 
+    /**
+     * Hoàn lại voucher cho người dùng khi hủy đơn hàng.
+     * Đặt lại trạng thái chưa sử dụng và giảm usedCount toàn cục.
+     */
+    public void markVoucherAsUnused(User user, String code) {
+        if (code == null || code.isBlank() || user == null) return;
+        Voucher voucher = voucherRepository.findByCode(code).orElse(null);
+        if (voucher == null) return;
+
+        // Đặt lại trạng thái chưa sử dụng cho người dùng này
+        userVoucherRepository.findByUser(user).stream()
+                .filter(uv -> uv.getVoucher().getCode().equalsIgnoreCase(code) && uv.isUsed())
+                .findFirst()
+                .ifPresent(uv -> {
+                    uv.setUsed(false);
+                    userVoucherRepository.save(uv);
+                });
+
+        // Giảm usedCount toàn cục
+        if (voucher.getUsedCount() != null && voucher.getUsedCount() > 0) {
+            voucher.setUsedCount(voucher.getUsedCount() - 1);
+            voucherRepository.save(voucher);
+        }
+    }
+
     private VoucherResponseDto mapToDto(Voucher voucher) {
         return VoucherResponseDto.builder()
                 .code(voucher.getCode())

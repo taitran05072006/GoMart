@@ -17,6 +17,10 @@ public class OrderStatusTransitionValidator {
 
     // ================= MAIN VALIDATE =================
     public void validate(Order order, OrderStatus newStatus) {
+        validate(order, newStatus, false);
+    }
+
+    public void validate(Order order, OrderStatus newStatus, boolean allowOperatorCancelInShipping) {
 
         OrderStatus currentStatus = order.getStatus();
 
@@ -28,7 +32,7 @@ public class OrderStatusTransitionValidator {
         }
 
         validatePrerequisites(order, newStatus);
-        validateBusinessRules(order, newStatus);
+        validateBusinessRules(order, newStatus, allowOperatorCancelInShipping);
     }
 
     // ================= PREREQUISITES =================
@@ -79,9 +83,33 @@ public class OrderStatusTransitionValidator {
             }
 
             case COMPLETED -> {
-                if (order.getStatus() != OrderStatus.DELIVERED) {
+                if (order.getStatus() != OrderStatus.DELIVERED && order.getStatus() != OrderStatus.RETURNED_TO_WAREHOUSE) {
                     throw new InvalidOrderStatusTransitionException(
-                            "Chỉ hoàn thành khi đơn đã giao"
+                            "Chỉ hoàn thành khi đơn đã giao hoặc khi từ chối hoàn trả"
+                    );
+                }
+            }
+
+            case RETURNED_TO_WAREHOUSE -> {
+                if (order.getStatus() != OrderStatus.RETURN_AWAITING_ADMIN_CONFIRM) {
+                    throw new InvalidOrderStatusTransitionException(
+                            "Hàng chỉ có thể về kho khi admin xác nhận từ trạng thái chờ duyệt"
+                    );
+                }
+            }
+
+            case RETURN_AWAITING_ADMIN_CONFIRM -> {
+                if (order.getStatus() != OrderStatus.RETURN_PICKING && order.getStatus() != OrderStatus.SHIPPING) {
+                    throw new InvalidOrderStatusTransitionException(
+                            "Chỉ có thể chờ admin duyệt khi shipper đang hoàn hàng hoặc giao thất bại"
+                    );
+                }
+            }
+
+            case RETURNED -> {
+                if (order.getStatus() != OrderStatus.RETURNED_TO_WAREHOUSE) {
+                    throw new InvalidOrderStatusTransitionException(
+                            "Chỉ có thể xác nhận đã hoàn trả khi hàng đã về kho hoàn"
                     );
                 }
             }
@@ -109,10 +137,10 @@ public class OrderStatusTransitionValidator {
     }
 
     // ================= BUSINESS RULES =================
-    private void validateBusinessRules(Order order, OrderStatus newStatus) {
+    private void validateBusinessRules(Order order, OrderStatus newStatus, boolean allowOperatorCancelInShipping) {
 User user = order.getUser();
         switch (newStatus) {
-            case CANCELLED -> validateCancel(order, user.isAdmin());
+            case CANCELLED -> validateCancel(order, user.isAdmin(), allowOperatorCancelInShipping);
             case RETURN_REQUESTED -> validateReturnRequest(order);
             default -> {
                 // no-op
@@ -121,7 +149,7 @@ User user = order.getUser();
     }
 
     // ================= CANCEL VALIDATION =================
-    public void validateCancel(Order order, boolean isAdmin) {
+    public void validateCancel(Order order, boolean isAdmin, boolean allowOperatorCancelInShipping) {
 
         if (!order.getStatus().canBeCancelled()) {
             throw new InvalidOrderStatusTransitionException(
@@ -137,31 +165,15 @@ User user = order.getUser();
             throw new InvalidOrderStatusTransitionException("Đơn đã giao");
         }
 
-        // payment rule: allow cancellation if it's already in shipping process (failed delivery)
-        if (order.isPaid() && !isAdmin && order.getStatus() != OrderStatus.SHIPPING) {
+        // Paid orders follow the same cancellation flow as COD orders.
+        // If cancellation is accepted, refund handling will run in service side-effects.
+
+        // Allow customer cancel as long as order has not been picked for delivery yet.
+        // The stage marker for picked/delivering is SHIPPING.
+        if (!isAdmin && !allowOperatorCancelInShipping && order.getStatus().ordinal() >= OrderStatus.SHIPPING.ordinal()) {
             throw new InvalidOrderStatusTransitionException(
-                    "Đơn đã thanh toán, cần hoàn tiền thay vì hủy"
+                    "Đơn đã vào quá trình giao, không thể hủy từ phía khách hàng"
             );
-        }
-
-        // shipper rule: allow if it's already in shipping process (failed delivery)
-        if (!isAdmin && order.getAssignedShipper() != null && order.getStatus() != OrderStatus.SHIPPING) {
-            throw new InvalidOrderStatusTransitionException(
-                    "Đơn đã có shipper nhận"
-            );
-        }
-
-        // time rule (safe null)
-        if (!isAdmin && order.getCreatedAt() != null) {
-            long minutes = Duration
-                    .between(order.getCreatedAt(), LocalDateTime.now())
-                    .toMinutes();
-
-            if (minutes > 30) {
-                throw new InvalidOrderStatusTransitionException(
-                        "Quá thời gian hủy (30 phút)"
-                );
-            }
         }
 
     }

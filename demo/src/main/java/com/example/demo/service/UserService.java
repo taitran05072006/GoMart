@@ -379,6 +379,7 @@ public class UserService {
                 .phone(user.getPhone())
                 .address(user.getAddress())
                 .role(user.getRole() != null ? user.getRole().name() : null)
+                .createdAt(user.getCreatedAt())
                 .build();
     }
     public ApiResponse<AuthResponseDto> getById(Long id){

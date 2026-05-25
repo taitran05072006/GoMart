@@ -98,7 +98,7 @@ const ProductList = () => {
     <div className="flex flex-col md:flex-row gap-6">
 
       {/* Sidebar */}
-      <div className="w-full md:w-64 flex-shrink-0">
+      <div className="w-full md:w-64 flex-shrink-0 md:sticky md:top-24 md:self-start">
         <Sidebar
           onCategorySelect={handleCategorySelect}
           selectedCategory={category}

@@ -275,8 +275,8 @@ public class ProductService {
                 .manufactureDate(product.getManufactureDate())
                 .expiryDate(product.getExpiryDate())
                 .description(product.getDescription())
-                .category(product.getCategory().getName())
-                .categoryId(product.getCategory().getId())
+                .category(product.getCategory() != null ? product.getCategory().getName() : "Không xác định")
+                .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
                 .units(units)
                 .build();
     }

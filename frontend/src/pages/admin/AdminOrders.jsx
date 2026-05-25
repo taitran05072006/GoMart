@@ -1,14 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Search, Filter, Download, Plus, Eye, MoreVertical,
   Package, Clock, CheckCircle2, Truck, XCircle, AlertCircle,
-  ChevronLeft, ChevronRight, User as UserIcon, Phone, Archive
+  ChevronLeft, ChevronRight, User as UserIcon, Phone, Archive,
+  MessageSquare
 } from 'lucide-react';
 import orderService from '../../services/orderService';
 import paymentService from '../../services/Payment';
 import authService from '../../services/authService';
+import { AuthContext } from '../../context/AuthContext';
+import OrderChat from '../../components/common/OrderChat';
+import { Client } from '@stomp/stompjs';
+import SockJSImport from 'sockjs-client/dist/sockjs';
+const SockJS = SockJSImport.default || SockJSImport;
+import axiosClient from '../../api/axiosClient';
 
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
 
@@ -25,6 +32,11 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'DELIVERED', label: 'Đã giao' },
   { value: 'COMPLETED', label: 'Hoàn thành' },
   { value: 'CANCELLED', label: 'Đã hủy' },
+  { value: 'RETURN_REQUESTED', label: 'Yêu cầu hoàn trả' },
+  { value: 'RETURN_PICKING', label: 'Đang lấy hàng hoàn' },
+  { value: 'RETURN_AWAITING_ADMIN_CONFIRM', label: 'Chờ duyệt hàng về kho' },
+  { value: 'RETURNED_TO_WAREHOUSE', label: 'Hàng đã về kho' },
+  { value: 'RETURNED', label: 'Đã hoàn tiền' },
 ];
 
 const badgeClass = (status) => {
@@ -42,12 +54,20 @@ const badgeClass = (status) => {
     case 'FAILED':
     case 'CANCELLED':
       return 'bg-rose-100 text-rose-700';
+    case 'RETURN_REQUESTED':
+    case 'RETURN_PICKING':
+    case 'RETURN_AWAITING_ADMIN_CONFIRM':
+    case 'RETURNED_TO_WAREHOUSE':
+      return 'bg-orange-100 text-orange-700';
+    case 'RETURNED':
+      return 'bg-indigo-100 text-indigo-700';
     default:
       return 'bg-slate-100 text-slate-700';
   }
 };
 
 const AdminOrders = () => {
+  const { user } = useContext(AuthContext);
   const [searchParams] = useSearchParams();
   const urlStatus = searchParams.get('status') || 'ALL';
 
@@ -70,6 +90,8 @@ const AdminOrders = () => {
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [unreadCountsByOrder, setUnreadCountsByOrder] = useState({});
+  const [autoOpenChat, setAutoOpenChat] = useState(false);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -103,6 +125,26 @@ const AdminOrders = () => {
         }
       });
       setShipperByOrder(selectedMap);
+
+      // Fetch historical unread counts for all orders in the list
+      try {
+        const counts = {};
+        await Promise.all(
+          orderList.map(async (order) => {
+            if (user?.id) {
+              const unreadRes = await axiosClient.get(`/orders/${order.id}/chat/unread`, {
+                params: { userId: user.id }
+              });
+              if (unreadRes.success) {
+                counts[order.id] = unreadRes.data;
+              }
+            }
+          })
+        );
+        setUnreadCountsByOrder(counts);
+      } catch (err) {
+        console.error("Không thể tải số tin nhắn chưa đọc cho Admin", err);
+      }
     } catch (error) {
       console.error(error);
       toast.error('Không thể tải danh sách đơn hàng');
@@ -114,6 +156,60 @@ const AdminOrders = () => {
   useEffect(() => {
     loadOrders();
   }, []);
+
+  // List-wide real-time chat notifications tracker for Admin
+  useEffect(() => {
+    if (!orders || orders.length === 0 || !user?.id) return undefined;
+
+    const apiBaseUrl = axiosClient.defaults.baseURL || 'http://localhost:8080/api';
+    const wsBaseUrl = apiBaseUrl.replace(/\/api\/?$/, '');
+
+    // Track all orders in the list to receive real-time updates (including cancelled/completed/returned ones)
+    const activeOrders = orders;
+    if (activeOrders.length === 0) return undefined;
+
+    let client;
+    const subscriptions = [];
+
+    try {
+      client = new Client({
+        webSocketFactory: () => new SockJS(`${wsBaseUrl}/ws`),
+        reconnectDelay: 5000,
+        debug: () => {},
+        onConnect: () => {
+          activeOrders.forEach(order => {
+            const subAdmin = client.subscribe(
+              `/topic/orders/${order.id}/chat/CUSTOMER_ADMIN`,
+              (messageOutput) => {
+                const newMsg = JSON.parse(messageOutput.body);
+                if (newMsg.senderId !== user.id) {
+                  if (!selectedOrder || selectedOrder.id !== order.id || !showDetailModal) {
+                    setUnreadCountsByOrder(prev => ({
+                      ...prev,
+                      [order.id]: (prev[order.id] || 0) + 1
+                    }));
+                  }
+                }
+              }
+            );
+            subscriptions.push(subAdmin);
+          });
+        },
+        onStompError: (frame) => {
+          console.error('Admin list unread tracker STOMP error:', frame.headers?.message);
+        }
+      });
+
+      client.activate();
+    } catch (e) {
+      console.error('Lỗi thiết lập admin list unread tracker:', e);
+    }
+
+    return () => {
+      subscriptions.forEach(sub => sub.unsubscribe());
+      if (client) client.deactivate();
+    };
+  }, [orders, user?.id, selectedOrder?.id, showDetailModal]);
 
   const stats = useMemo(() => {
     return {
@@ -291,17 +387,15 @@ const AdminOrders = () => {
             />
           </div>
 
-          {selectedStatus === 'ALL' && (
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-4 focus:ring-blue-50 bg-white font-medium"
-            >
-              {STATUS_FILTER_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          )}
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-4 focus:ring-blue-50 bg-white font-medium"
+          >
+            {STATUS_FILTER_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
 
           <select
             value={selectedPaymentStatus}
@@ -400,12 +494,39 @@ const AdminOrders = () => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {/* Chat button with unread count */}
                         <button
                           onClick={() => {
                             setSelectedOrder(order);
+                            setAutoOpenChat(true);
+                            setShowDetailModal(true);
+                            setUnreadCountsByOrder(prev => ({
+                              ...prev,
+                              [order.id]: 0
+                            }));
+                          }}
+                          className={`relative p-2 rounded-lg transition-all ${
+                            unreadCountsByOrder[order.id] > 0
+                              ? 'bg-rose-50 text-rose-500 hover:bg-rose-100 scale-105'
+                              : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
+                          }`}
+                          title="Trò chuyện hỗ trợ"
+                        >
+                          <MessageSquare size={18} />
+                          {unreadCountsByOrder[order.id] > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border border-white shadow animate-bounce">
+                              {unreadCountsByOrder[order.id]}
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setAutoOpenChat(false);
                             setShowDetailModal(true);
                           }}
                           className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          title="Xem chi tiết"
                         >
                           <Eye size={18} />
                         </button>
@@ -471,6 +592,9 @@ const AdminOrders = () => {
           onAssignShipper={assignShipper}
           onCancelPayment={cancelPayment}
           onRecreatePayment={recreateTransferPayment}
+          currentUser={user}
+          autoOpenChat={autoOpenChat}
+          onClearAutoOpenChat={() => setAutoOpenChat(false)}
         />
       )}
     </div>
@@ -479,8 +603,71 @@ const AdminOrders = () => {
 
 const OrderDetailModal = ({
   order, payment, shippers, shipperId, onSetShipperId, onClose,
-  onUpdateStatus, onConfirmCod, onAssignShipper, onCancelPayment, onRecreatePayment
+  onUpdateStatus, onConfirmCod, onAssignShipper, onCancelPayment, onRecreatePayment,
+  currentUser, autoOpenChat, onClearAutoOpenChat
 }) => {
+  const [showChatModal, setShowChatModal] = useState(autoOpenChat || false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (autoOpenChat) {
+      setShowChatModal(true);
+      if (onClearAutoOpenChat) onClearAutoOpenChat();
+    }
+  }, [autoOpenChat]);
+
+  // Reset unread count when order changes
+  useEffect(() => {
+    setUnreadCount(0);
+  }, [order?.id]);
+
+  // Real-time unread messages listener via STOMP WS
+  useEffect(() => {
+    const orderId = order?.id;
+    if (!orderId || !currentUser?.id) return undefined;
+    if (showChatModal) {
+      setUnreadCount(0);
+      return undefined;
+    }
+
+    const apiBaseUrl = axiosClient.defaults.baseURL || 'http://localhost:8080/api';
+    const wsBaseUrl = apiBaseUrl.replace(/\/api\/?$/, '');
+
+    let client;
+    let subscription;
+
+    try {
+      client = new Client({
+        webSocketFactory: () => new SockJS(`${wsBaseUrl}/ws`),
+        reconnectDelay: 5000,
+        debug: () => {},
+        onConnect: () => {
+          subscription = client.subscribe(
+            `/topic/orders/${orderId}/chat/CUSTOMER_ADMIN`,
+            (messageOutput) => {
+              const newMsg = JSON.parse(messageOutput.body);
+              if (newMsg.senderId !== currentUser.id) {
+                setUnreadCount((prev) => prev + 1);
+              }
+            }
+          );
+        },
+        onStompError: (frame) => {
+          console.error('STOMP error in admin unread count tracking:', frame.headers?.message);
+        }
+      });
+
+      client.activate();
+    } catch (e) {
+      console.error('Error setup WS unread tracker in Admin:', e);
+    }
+
+    return () => {
+      if (subscription) subscription.unsubscribe();
+      if (client) client.deactivate();
+    };
+  }, [order?.id, currentUser?.id, showChatModal]);
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
@@ -642,22 +829,52 @@ const OrderDetailModal = ({
                 </div>
               )}
 
-              {order.status === 'DELIVERED' && (
-                <button
-                  onClick={() => onUpdateStatus(order.id, 'COMPLETED')}
-                  className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
-                >
-                  Hoàn thành đơn hàng
-                </button>
-              )}
+
 
               {order.status === 'RETURN_REQUESTED' && (
-                <button
-                  onClick={() => onUpdateStatus(order.id, 'RETURNED')}
-                  className="rounded-xl bg-slate-700 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-100 hover:bg-slate-900 transition-all"
-                >
-                  Xác nhận đã trả hàng
-                </button>
+                <span className="text-xs text-orange-600 font-bold uppercase tracking-wider bg-orange-50 border border-orange-200/50 rounded-xl px-4 py-2 shadow-sm">
+                  ⏳ Đang chờ Shipper lấy hàng hoàn...
+                </span>
+              )}
+
+              {order.status === 'RETURN_PICKING' && (
+                <span className="text-xs text-amber-600 font-bold uppercase tracking-wider bg-amber-50 border border-amber-200/50 rounded-xl px-4 py-2 shadow-sm">
+                  🚚 Shipper đang vận chuyển hàng hoàn về kho...
+                </span>
+              )}
+
+              {order.status === 'RETURN_AWAITING_ADMIN_CONFIRM' && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => onUpdateStatus(order.id, 'RETURNED_TO_WAREHOUSE')}
+                    className="rounded-xl bg-orange-600 text-white px-6 py-2.5 text-sm font-bold shadow-lg shadow-orange-100 hover:bg-orange-700 transition-all duration-300"
+                  >
+                    ✓ Duyệt xác nhận hàng đã về kho
+                  </button>
+                </div>
+              )}
+
+              {order.status === 'RETURNED_TO_WAREHOUSE' && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => onUpdateStatus(order.id, 'RETURNED')}
+                    className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-2.5 text-sm font-bold shadow-lg shadow-emerald-100 hover:from-emerald-600 hover:to-teal-700 transition-all duration-300"
+                  >
+                    ✓ Xác nhận đã nhận hàng từ Shipper & Nhập kho
+                  </button>
+                  <button
+                    onClick={() => {
+                      const reason = window.prompt("Nhập lý do từ chối nhận hàng hoàn (ví dụ: hàng trả không đúng):");
+                      if (reason) {
+                        onUpdateStatus(order.id, 'COMPLETED');
+                        toast.success("Đã từ chối nhận hàng hoàn. Đơn hàng khôi phục về trạng thái Hoàn thành.");
+                      }
+                    }}
+                    className="rounded-xl border border-rose-500 bg-white text-rose-500 px-6 py-2.5 text-sm font-bold hover:bg-rose-50 transition-all duration-300 shadow-sm"
+                  >
+                    &times; Từ chối (Hàng không đúng)
+                  </button>
+                </div>
               )}
 
               {/* Reset/Cancel Actions */}
@@ -679,6 +896,75 @@ const OrderDetailModal = ({
                 </button>
               )}
             </div>
+
+            {/* Chat Box for Admin & Customer */}
+            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <h4 className="text-sm font-black uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
+                <span>💬</span> Hộp thoại hỗ trợ khách hàng
+              </h4>
+              <div className="flex justify-center bg-slate-50/50 rounded-3xl border border-slate-100/80 py-6 px-12">
+                <button 
+                  onClick={() => {
+                    setShowChatModal(true);
+                    setUnreadCount(0);
+                  }}
+                  className="flex flex-col items-center gap-3 group focus:outline-none relative"
+                >
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-200/80 group-hover:shadow-blue-300/80 transition-all duration-300 group-hover:scale-110 active:scale-95 relative">
+                    <UserIcon size={26} className="group-hover:rotate-12 transition-transform duration-300" />
+                    
+                    {unreadCount > 0 ? (
+                      <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md animate-bounce">
+                        {unreadCount}
+                      </span>
+                    ) : (
+                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white"></span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-xs font-black uppercase tracking-wider text-slate-700 group-hover:text-blue-600 transition-colors">Nhắn với Khách</span>
+                    <span className="block text-[10px] text-slate-400 font-medium mt-0.5">Trò chuyện hỗ trợ</span>
+                  </div>
+                </button>
+              </div>
+
+              {/* Real-time Chat Modal for Admin */}
+              {showChatModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+                  <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md" onClick={() => setShowChatModal(false)}></div>
+                  <div className="relative w-full max-w-xl animate-in zoom-in-95 duration-200 flex flex-col gap-4">
+                    
+                    {/* Elegant Header Above the Chat Box */}
+                    <div className="flex items-center justify-between text-slate-800 bg-white/95 backdrop-blur px-6 py-4 rounded-2xl shadow-sm border border-slate-100/50">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">💬</span>
+                        <span className="font-bold text-slate-800 text-sm md:text-base">Trò chuyện với Khách hàng</span>
+                      </div>
+                      <button 
+                        onClick={() => setShowChatModal(false)}
+                        className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-lg font-bold transition-all focus:outline-none"
+                      >
+                        &times;
+                      </button>
+                    </div>
+
+                    {/* Chat Box Container */}
+                    <div className="h-[500px]">
+                      <OrderChat 
+                        order={order} 
+                        currentUser={currentUser} 
+                        role="ADMIN" 
+                        forcedChannel="CUSTOMER_ADMIN" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       </div>

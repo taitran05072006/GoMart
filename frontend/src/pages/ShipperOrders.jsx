@@ -2,6 +2,12 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { AuthContext } from '../context/AuthContext';
 import orderService from '../services/orderService';
+import OrderChat from '../components/common/OrderChat';
+import { Client } from '@stomp/stompjs';
+import SockJSImport from 'sockjs-client/dist/sockjs';
+const SockJS = SockJSImport.default || SockJSImport;
+import axiosClient from '../api/axiosClient';
+import { User, Lock, MessageSquare } from 'lucide-react';
 
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
 
@@ -22,6 +28,12 @@ const statusClass = (status) => {
       return 'bg-rose-100 text-rose-800';
     case 'RETURN_REQUESTED':
       return 'bg-orange-100 text-orange-800';
+    case 'RETURN_PICKING':
+      return 'bg-amber-100 text-amber-800';
+    case 'RETURN_AWAITING_ADMIN_CONFIRM':
+      return 'bg-orange-100 text-orange-800';
+    case 'RETURNED_TO_WAREHOUSE':
+      return 'bg-sky-100 text-sky-800';
     case 'RETURNED':
       return 'bg-indigo-100 text-indigo-800';
     default:
@@ -36,6 +48,124 @@ const ShipperOrders = () => {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCountsByOrder, setUnreadCountsByOrder] = useState({});
+  const [autoOpenChat, setAutoOpenChat] = useState(false);
+
+  // Reset count when selected order changes
+  useEffect(() => {
+    setUnreadCount(0);
+  }, [detail?.id]);
+
+  // Sync autoOpenChat with showChatModal when detail has loaded for the selected order
+  useEffect(() => {
+    if (autoOpenChat && detail?.id === selectedId) {
+      setShowChatModal(true);
+      setAutoOpenChat(false);
+    }
+  }, [autoOpenChat, detail?.id, selectedId]);
+
+  // List-wide real-time chat notifications tracker for Shipper
+  useEffect(() => {
+    if (!orders || orders.length === 0 || !user?.id) return undefined;
+
+    const apiBaseUrl = axiosClient.defaults.baseURL || 'http://localhost:8080/api';
+    const wsBaseUrl = apiBaseUrl.replace(/\/api\/?$/, '');
+
+    // Track all orders in the list to receive real-time updates (including cancelled/completed/returned ones)
+    const activeOrders = orders;
+    if (activeOrders.length === 0) return undefined;
+
+    let client;
+    const subscriptions = [];
+
+    try {
+      client = new Client({
+        webSocketFactory: () => new SockJS(`${wsBaseUrl}/ws`),
+        reconnectDelay: 5000,
+        debug: () => {},
+        onConnect: () => {
+          activeOrders.forEach(order => {
+            const subShipper = client.subscribe(
+              `/topic/orders/${order.id}/chat/CUSTOMER_SHIPPER`,
+              (messageOutput) => {
+                const newMsg = JSON.parse(messageOutput.body);
+                if (newMsg.senderId !== user.id) {
+                  if (selectedId !== order.id || !showChatModal) {
+                    setUnreadCountsByOrder(prev => ({
+                      ...prev,
+                      [order.id]: (prev[order.id] || 0) + 1
+                    }));
+                  }
+                }
+              }
+            );
+            subscriptions.push(subShipper);
+          });
+        },
+        onStompError: (frame) => {
+          console.error('Shipper list unread tracker STOMP error:', frame.headers?.message);
+        }
+      });
+
+      client.activate();
+    } catch (e) {
+      console.error('Lỗi thiết lập shipper list unread tracker:', e);
+    }
+
+    return () => {
+      subscriptions.forEach(sub => sub.unsubscribe());
+      if (client) client.deactivate();
+    };
+  }, [orders, user?.id, selectedId, showChatModal]);
+
+  // Real-time unread messages tracking via STOMP WS
+  useEffect(() => {
+    const orderId = detail?.id;
+    if (!orderId || !user?.id) return undefined;
+    if (showChatModal) {
+      setUnreadCount(0);
+      return undefined;
+    }
+
+    const apiBaseUrl = axiosClient.defaults.baseURL || 'http://localhost:8080/api';
+    const wsBaseUrl = apiBaseUrl.replace(/\/api\/?$/, '');
+
+    let client;
+    let subscription;
+
+    try {
+      client = new Client({
+        webSocketFactory: () => new SockJS(`${wsBaseUrl}/ws`),
+        reconnectDelay: 5000,
+        debug: () => {},
+        onConnect: () => {
+          subscription = client.subscribe(
+            `/topic/orders/${orderId}/chat/CUSTOMER_SHIPPER`,
+            (messageOutput) => {
+              const newMsg = JSON.parse(messageOutput.body);
+              if (newMsg.senderId !== user.id) {
+                setUnreadCount((prev) => prev + 1);
+              }
+            }
+          );
+        },
+        onStompError: (frame) => {
+          console.error('STOMP error in shipper unread count tracking:', frame.headers?.message);
+        }
+      });
+
+      client.activate();
+    } catch (e) {
+      console.error('Error setup WS unread tracker in Shipper:', e);
+    }
+
+    return () => {
+      if (subscription) subscription.unsubscribe();
+      if (client) client.deactivate();
+    };
+  }, [detail?.id, user?.id, showChatModal]);
 
   const loadOrders = async () => {
     if (!user?.id) return;
@@ -48,6 +178,24 @@ const ShipperOrders = () => {
         ? selectedId
         : data[0]?.id || null;
       setSelectedId(nextSelected);
+
+      // Fetch historical unread counts for all shipper's orders
+      try {
+        const counts = {};
+        await Promise.all(
+          data.map(async (order) => {
+            const unreadRes = await axiosClient.get(`/orders/${order.id}/chat/unread`, {
+              params: { userId: user.id }
+            });
+            if (unreadRes.success) {
+              counts[order.id] = unreadRes.data;
+            }
+          })
+        );
+        setUnreadCountsByOrder(counts);
+      } catch (err) {
+        console.error("Không thể tải số tin nhắn chưa đọc cho Shipper", err);
+      }
     } catch (error) {
       toast.error(error.message || 'Không thể tải danh sách đơn hàng');
     } finally {
@@ -171,30 +319,63 @@ const ShipperOrders = () => {
         ) : (
           <div className="space-y-3">
             {orders.map((order) => (
-              <button
+              <div
                 key={order.id}
-                type="button"
                 onClick={() => setSelectedId(order.id)}
-                className={`w-full rounded-xl border p-3 text-left transition ${selectedId === order.id
-                  ? 'border-blue-500 bg-blue-50'
+                className={`w-full rounded-xl border p-3 flex justify-between items-center transition cursor-pointer ${selectedId === order.id
+                  ? 'border-blue-500 bg-blue-50/40 shadow-sm'
                   : 'border-slate-200 hover:bg-slate-50'
-                  }`}
+                }`}
               >
-                <p className="font-semibold text-slate-900">#{order.orderCode}</p>
-                <p className="text-sm text-slate-600">Khách hàng: {order.customerName || 'Khách hàng'}</p>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass(order.status)}`}>
-                    {order.status === 'PENDING' ? 'Chờ xác nhận' :
-                      order.status === 'PACKING' ? 'Đang chuẩn bị hàng' :
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-slate-900">#{order.orderCode}</p>
+                  <p className="text-xs text-slate-600 mt-0.5 truncate">Khách: {order.customerName || 'Khách hàng'}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${statusClass(order.status)}`}>
+                      {order.status === 'PENDING' ? 'Chờ thanh toán' :
+                        order.status === 'PACKING' ? 'Đang chuẩn bị hàng' :
                         order.status === 'SHIPPING' ? 'Đang giao hàng' :
-                          order.status === 'DELIVERED' ? 'Đã giao hàng' :
-                            order.status === 'CANCELLED' ? 'Đã hủy' :
-                              order.status === 'RETURNED' ? 'Đã hoàn hàng' :
-                                order.status}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-800">{currency.format(order.finalPrice || order.totalPrice || 0)}</span>
+                        order.status === 'DELIVERED' ? 'Đã giao hàng' :
+                        order.status === 'CANCELLED' ? 'Đã hủy' :
+                        order.status === 'RETURN_REQUESTED' ? 'Yêu cầu hoàn trả' :
+                        order.status === 'RETURN_PICKING' ? 'Đang lấy hàng hoàn' :
+                        order.status === 'RETURN_AWAITING_ADMIN_CONFIRM' ? 'Chờ admin duyệt về kho' :
+                        order.status === 'RETURNED_TO_WAREHOUSE' ? 'Hàng đã về kho' :
+                        order.status === 'RETURNED' ? 'Đã hoàn trả' :
+                        order.status === 'COMPLETED' ? 'Hoàn thành' :
+                        order.status}
+                    </span>
+                    <span className="text-xs font-bold text-slate-800 mr-2">{currency.format(order.finalPrice || order.totalPrice || 0)}</span>
+                  </div>
                 </div>
-              </button>
+
+                {/* Right side: Quick Chat Button for Shipper */}
+                <div className="flex items-center pl-2" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => {
+                      setSelectedId(order.id);
+                      setAutoOpenChat(true);
+                      setUnreadCountsByOrder(prev => ({
+                        ...prev,
+                        [order.id]: 0
+                      }));
+                    }}
+                    className={`relative p-2.5 rounded-full transition-all border shadow-sm ${
+                      unreadCountsByOrder[order.id] > 0
+                        ? 'bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100 scale-105 shadow-rose-100 animate-pulse'
+                        : 'bg-white border-slate-150 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-slate-50'
+                    }`}
+                    title="Nhắn tin với khách"
+                  >
+                    <MessageSquare size={16} />
+                    {unreadCountsByOrder[order.id] > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border border-white shadow animate-bounce">
+                        {unreadCountsByOrder[order.id]}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -211,12 +392,17 @@ const ShipperOrders = () => {
                 <p className="text-sm text-slate-500">Đặt lúc {new Date(detail.orderDate).toLocaleString('vi-VN')}</p>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass(detail.status)}`}>
-                {detail.status === 'PENDING' ? 'Chờ xác nhận' :
+                {detail.status === 'PENDING' ? 'Chờ thanh toán' :
                   detail.status === 'PACKING' ? 'Đang chuẩn bị hàng' :
                     detail.status === 'SHIPPING' ? 'Đang giao hàng' :
                       detail.status === 'DELIVERED' ? 'Đã giao hàng' :
                         detail.status === 'CANCELLED' ? 'Đã hủy' :
-                          detail.status === 'RETURNED' ? 'Đã hoàn hàng' :
+                          detail.status === 'RETURN_REQUESTED' ? 'Yêu cầu hoàn trả' :
+                          detail.status === 'RETURN_PICKING' ? 'Đang lấy hàng hoàn' :
+                          detail.status === 'RETURN_AWAITING_ADMIN_CONFIRM' ? 'Chờ admin duyệt về kho' :
+                          detail.status === 'RETURNED_TO_WAREHOUSE' ? 'Hàng đã về kho' :
+                          detail.status === 'RETURNED' ? 'Đã hoàn trả' :
+                          detail.status === 'COMPLETED' ? 'Hoàn thành' :
                             detail.status}
               </span>
             </div>
@@ -309,10 +495,80 @@ const ShipperOrders = () => {
                   onClick={handleReturnCompleted}
                   className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
                 >
-                  Xác nhận đã hoàn về kho
+                  Shipper xác nhận đã trả hàng
                 </button>
               )}
             </div>
+
+            {/* Chat Box for Shipper & Customer */}
+            {(detail.status === 'SHIPPING' || detail.status === 'DELIVERED' || detail.status === 'COMPLETED' || detail.status === 'RETURN_REQUESTED' || detail.status === 'RETURN_PICKING' || detail.status === 'RETURN_AWAITING_ADMIN_CONFIRM' || detail.status === 'RETURNED') && (
+              <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <h4 className="text-sm font-black uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
+                  <span>💬</span> Trò chuyện với Khách hàng
+                </h4>
+                <div className="flex justify-center bg-slate-50/50 rounded-3xl border border-slate-100/80 py-6 px-12">
+                  <button 
+                    onClick={() => {
+                      setShowChatModal(true);
+                      setUnreadCount(0);
+                    }}
+                    className="flex flex-col items-center gap-3 group focus:outline-none relative"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-amber-200/80 group-hover:shadow-amber-300/80 transition-all duration-300 group-hover:scale-110 active:scale-95 relative">
+                      <User size={26} className="group-hover:rotate-12 transition-transform duration-300" />
+                      
+                      {unreadCount > 0 ? (
+                        <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md animate-bounce">
+                          {unreadCount}
+                        </span>
+                      ) : (
+                        <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white"></span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <span className="block text-xs font-black uppercase tracking-wider text-slate-700 group-hover:text-amber-600 transition-colors">Nhắn với Khách</span>
+                      <span className="block text-[10px] text-slate-400 font-medium mt-0.5">Trò chuyện giao hàng</span>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Real-time Chat Modal for Shipper */}
+                {showChatModal && (
+                  <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+                    <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md" onClick={() => setShowChatModal(false)}></div>
+                    <div className="relative w-full max-w-xl animate-in zoom-in-95 duration-200 flex flex-col gap-4">
+                      
+                      {/* Elegant Header Above the Chat Box */}
+                      <div className="flex items-center justify-between text-slate-800 bg-white/95 backdrop-blur px-6 py-4 rounded-2xl shadow-sm border border-slate-100/50">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">💬</span>
+                          <span className="font-bold text-slate-800 text-sm md:text-base">Trò chuyện với Khách hàng</span>
+                        </div>
+                        <button 
+                          onClick={() => setShowChatModal(false)}
+                          className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-lg font-bold transition-all focus:outline-none"
+                        >
+                          &times;
+                        </button>
+                      </div>
+
+                      {/* Chat Box Container */}
+                      <div className="h-[500px]">
+                        <OrderChat 
+                          order={detail} 
+                          currentUser={user} 
+                          role="SHIPPER" 
+                          forcedChannel="CUSTOMER_SHIPPER" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </section>

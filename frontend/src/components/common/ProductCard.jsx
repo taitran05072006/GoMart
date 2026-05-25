@@ -72,9 +72,33 @@ const ProductCard = ({ product }) => {
         {/* Info Section: Premium Layout */}
         <div className="p-5 flex flex-col flex-1 relative bg-white">
           <div className="mb-3">
-             <div className="flex items-center gap-2 mb-1">
-                <span className="h-px w-3 bg-rose-500" />
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.3em]">Premium</span>
+             <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                   <span className="h-px w-3 bg-rose-500" />
+                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.3em]">Premium</span>
+                </div>
+                {/* Rating Stars */}
+                <div className="flex items-center gap-1 bg-amber-50/40 px-2 py-0.5 rounded-lg border border-amber-100/20">
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const r = product.rating && product.rating > 0 ? product.rating : 5.0;
+                      const isFilled = star <= Math.round(r);
+                      return (
+                        <Star 
+                          key={star} 
+                          size={9} 
+                          className={isFilled ? "fill-amber-400 text-amber-400" : "text-slate-200"} 
+                        />
+                      );
+                    })}
+                  </div>
+                  <span className="text-[9px] font-black text-slate-800 ml-0.5">
+                    {Number(product.rating && product.rating > 0 ? product.rating : 5.0).toFixed(1)}
+                  </span>
+                  <span className="text-[8px] font-bold text-slate-400">
+                    ({product.reviews || 0})
+                  </span>
+                </div>
              </div>
              <Link to={`/products/${product.id}`}>
                <h3 className="font-bold text-slate-900 text-base line-clamp-2 leading-tight tracking-tight group-hover:text-rose-600 transition-colors duration-500">

@@ -75,4 +75,16 @@ public class PaymentController {
                 paymentService.getSupportedMethods()
         );
     }
+
+    /**
+     * Đổi phương thức thanh toán sang COD (Thanh toán khi nhận hàng)
+     * Chỉ áp dụng khi đơn hàng đang dùng BANK_TRANSFER và chưa thanh toán.
+     */
+    @PatchMapping("/switch-to-cod")
+    public ApiResponse<PaymentResponseDto> switchToCod(@PathVariable Long orderId) {
+        return ApiResponse.success(
+                "Đã chuyển sang thanh toán khi nhận hàng",
+                paymentService.switchPaymentToCod(orderId)
+        );
+    }
 }

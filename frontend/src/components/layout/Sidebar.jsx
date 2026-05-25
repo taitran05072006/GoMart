@@ -26,7 +26,7 @@ const Sidebar = ({ onCategorySelect, selectedCategory }) => {
   }, [categories, search]);
 
   return (
-    <div className="bg-transparent md:bg-white rounded-xl md:shadow-sm md:border md:border-gray-100 p-0 md:p-4 h-full">
+    <div className="bg-white/95 backdrop-blur-sm md:bg-white rounded-xl shadow-sm border border-gray-100 p-2 md:p-4 h-full">
 
       {/* Header */}
       <h3 className="font-bold text-gray-800 uppercase tracking-wider mb-3 border-b pb-2 hidden md:block">

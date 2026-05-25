@@ -5,9 +5,14 @@ import orderService from '../services/orderService';
 import authService from '../services/authService';
 import Spinner from '../components/common/Spinner';
 import toast from 'react-hot-toast';
-import { Package, User, CreditCard, XCircle } from 'lucide-react';
+import { Package, User, CreditCard, XCircle, Shield, Truck, Lock, MessageSquare } from 'lucide-react';
 import paymentService from '../services/Payment';
 import QRPaymentModal from '../components/checkout/QRPaymentModal';
+import OrderChat from '../components/common/OrderChat';
+import { Client } from '@stomp/stompjs';
+import SockJSImport from 'sockjs-client/dist/sockjs';
+const SockJS = SockJSImport.default || SockJSImport;
+import axiosClient from '../api/axiosClient';
 
 const useQuery = () => new URLSearchParams(useLocation().search);
 
@@ -24,6 +29,136 @@ const Profile = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showQRModal, setShowQRModal] = useState(false);
   const [paymentSession, setPaymentSession] = useState(null);
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [activeChatChannel, setActiveChatChannel] = useState('CUSTOMER_ADMIN');
+  const [unreadAdminCount, setUnreadAdminCount] = useState(0);
+  const [unreadShipperCount, setUnreadShipperCount] = useState(0);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingStars, setRatingStars] = useState(5);
+  const [ratingOrder, setRatingOrder] = useState(null);
+  const [unreadCountsByOrder, setUnreadCountsByOrder] = useState({});
+
+  // List-wide real-time chat notifications tracker
+  useEffect(() => {
+    if (!orders || orders.length === 0 || !user?.id) return undefined;
+
+    const apiBaseUrl = axiosClient.defaults.baseURL || 'http://localhost:8080/api';
+    const wsBaseUrl = apiBaseUrl.replace(/\/api\/?$/, '');
+
+    // Track all orders in the list to receive real-time updates (including cancelled/completed/returned ones)
+    const activeOrders = orders;
+    if (activeOrders.length === 0) return undefined;
+
+    let client;
+    const subscriptions = [];
+
+    try {
+      client = new Client({
+        webSocketFactory: () => new SockJS(`${wsBaseUrl}/ws`),
+        reconnectDelay: 5000,
+        debug: () => {},
+        onConnect: () => {
+          activeOrders.forEach(order => {
+            const subAdmin = client.subscribe(
+              `/topic/orders/${order.id}/chat/CUSTOMER_ADMIN`,
+              (messageOutput) => {
+                const newMsg = JSON.parse(messageOutput.body);
+                if (newMsg.senderId !== user.id) {
+                  if (!showChatModal || selectedOrder?.id !== order.id || activeChatChannel !== 'CUSTOMER_ADMIN') {
+                    setUnreadCountsByOrder(prev => ({
+                      ...prev,
+                      [order.id]: (prev[order.id] || 0) + 1
+                    }));
+                  }
+                }
+              }
+            );
+            subscriptions.push(subAdmin);
+
+            // Keep order-list badge focused on CUSTOMER_ADMIN channel to avoid
+            // showing unread from locked shipper channel.
+          });
+        },
+        onStompError: (frame) => {
+          console.error('List unread tracker STOMP error:', frame.headers?.message);
+        }
+      });
+
+      client.activate();
+    } catch (e) {
+      console.error('Lỗi thiết lập list unread tracker:', e);
+    }
+
+    return () => {
+      subscriptions.forEach(sub => sub.unsubscribe());
+      if (client) client.deactivate();
+    };
+  }, [orders, user?.id, showChatModal, selectedOrder?.id, activeChatChannel]);
+
+  // Reset counts when selectedOrder changes
+  useEffect(() => {
+    setUnreadAdminCount(0);
+    setUnreadShipperCount(0);
+  }, [selectedOrder?.id]);
+
+  // Real-time unread chat notifications tracker
+  useEffect(() => {
+    const orderId = selectedOrder?.id;
+    if (!orderId || !user?.id) return undefined;
+
+    const apiBaseUrl = axiosClient.defaults.baseURL || 'http://localhost:8080/api';
+    const wsBaseUrl = apiBaseUrl.replace(/\/api\/?$/, '');
+
+    let client;
+    let subAdmin;
+    let subShipper;
+
+    try {
+      client = new Client({
+        webSocketFactory: () => new SockJS(`${wsBaseUrl}/ws`),
+        reconnectDelay: 5000,
+        debug: () => {},
+        onConnect: () => {
+          subAdmin = client.subscribe(
+            `/topic/orders/${orderId}/chat/CUSTOMER_ADMIN`,
+            (messageOutput) => {
+              const newMsg = JSON.parse(messageOutput.body);
+              if (newMsg.senderId !== user.id) {
+                if (!showChatModal || activeChatChannel !== 'CUSTOMER_ADMIN') {
+                  setUnreadAdminCount((prev) => prev + 1);
+                }
+              }
+            }
+          );
+
+          subShipper = client.subscribe(
+            `/topic/orders/${orderId}/chat/CUSTOMER_SHIPPER`,
+            (messageOutput) => {
+              const newMsg = JSON.parse(messageOutput.body);
+              if (newMsg.senderId !== user.id) {
+                if (!showChatModal || activeChatChannel !== 'CUSTOMER_SHIPPER') {
+                  setUnreadShipperCount((prev) => prev + 1);
+                }
+              }
+            }
+          );
+        },
+        onStompError: (frame) => {
+          console.error('Broker error:', frame.headers?.message);
+        }
+      });
+
+      client.activate();
+    } catch (e) {
+      console.error('Lỗi unread tracking customer', e);
+    }
+
+    return () => {
+      if (subAdmin) subAdmin.unsubscribe();
+      if (subShipper) subShipper.unsubscribe();
+      if (client) client.deactivate();
+    };
+  }, [selectedOrder?.id, user?.id, showChatModal, activeChatChannel]);
 
 
   const [profileData, setProfileData] = useState({
@@ -95,10 +230,39 @@ const Profile = () => {
      if(!user) return;
      setLoadingOrders(true);
      try {
+        try {
+          const userRes = await authService.getUserById(user.id);
+          const latestUser = userRes?.data;
+          if (latestUser) {
+            setUser(latestUser);
+            localStorage.setItem('user', JSON.stringify(latestUser));
+          }
+        } catch (e) {
+          console.error('Không thể đồng bộ sao tích lũy mới nhất', e);
+        }
+
         const res = await orderService.getAllOrders();
         const allOrders = res.data || res || [];
         const myOrders = allOrders.filter(o => o.userId === user.id || o.user?.id === user.id);
         setOrders(myOrders);
+
+        // Fetch historical unread counts for each order
+        try {
+          const counts = {};
+          await Promise.all(
+            myOrders.map(async (order) => {
+              const unreadRes = await axiosClient.get(`/orders/${order.id}/chat/unread`, {
+                params: { userId: user.id, channel: 'CUSTOMER_ADMIN' }
+              });
+              if (unreadRes.success) {
+                counts[order.id] = unreadRes.data;
+              }
+            })
+          );
+          setUnreadCountsByOrder(counts);
+        } catch (err) {
+          console.error("Không thể tải số tin nhắn chưa đọc", err);
+        }
      } finally {
         setLoadingOrders(false);
      }
@@ -155,6 +319,57 @@ const Profile = () => {
     }
   };
 
+  const handleSwitchToCod = async (order) => {
+    if (!window.confirm("Bạn có chắc muốn đổi sang thanh toán khi nhận hàng (COD)? Phiên thanh toán QR hiện tại sẽ bị hủy.")) return;
+    try {
+      await paymentService.switchToCod(order.id);
+      toast.success("Đã chuyển sang thanh toán khi nhận hàng thành công!");
+      // Reload orders to get fresh status
+      await fetchOrders();
+      // Update selectedOrder with new payment info
+      setSelectedOrder(prev => ({
+        ...prev,
+        paymentMethod: 'COD',
+        paymentStatus: 'UNPAID',
+        status: prev.status === 'PAID' ? 'PENDING' : prev.status,
+      }));
+    } catch (err) {
+      toast.error("Lỗi khi đổi phương thức: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleNotReceived = async (order) => {
+    if (!window.confirm("Bạn xác nhận chưa nhận được hàng? Chúng tôi sẽ gửi yêu cầu khiếu nại tới Admin để giải quyết lập tức.")) return;
+    try {
+      await orderService.requestReturn(order.id, "Chưa nhận được hàng - Khiếu nại giao nhận");
+      toast.success("Đã gửi khiếu nại chưa nhận được hàng thành công!");
+      fetchOrders();
+      // Auto open Admin chat
+      setActiveChatChannel('CUSTOMER_ADMIN');
+      setShowChatModal(true);
+      if (selectedOrder && (selectedOrder.id === order.id || selectedOrder.orderId === order.id)) {
+        setSelectedOrder(prev => ({ ...prev, status: 'RETURN_REQUESTED' }));
+      }
+    } catch (err) {
+      toast.error("Lỗi gửi khiếu nại: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleCompleteOrderWithRating = async () => {
+    if (!ratingOrder) return;
+    try {
+      await orderService.updateStatus(ratingOrder.id, 'COMPLETED', ratingStars);
+      toast.success("Đơn hàng đã được hoàn thành. Cảm ơn bạn đã đánh giá!");
+      setShowRatingModal(false);
+      fetchOrders();
+      if (selectedOrder && (selectedOrder.id === ratingOrder.id || selectedOrder.orderId === ratingOrder.id)) {
+        setSelectedOrder(prev => ({ ...prev, status: 'COMPLETED', rating: ratingStars }));
+      }
+    } catch (err) {
+      toast.error("Lỗi khi hoàn thành đơn hàng: " + (err.response?.data?.message || err.message));
+    }
+  };
+
   const canReturn = (order) => {
     if (!order.actualDeliveryTime) return false;
     const deliveryDate = new Date(order.actualDeliveryTime);
@@ -162,6 +377,28 @@ const Profile = () => {
     const diffTime = now - deliveryDate;
     const diffDays = diffTime / (1000 * 60 * 60 * 24);
     return diffDays <= 3;
+  };
+
+  const paymentMethodLabel = (method) => {
+    if (method === 'COD') return 'Nhận hàng';
+    if (method === 'BANK_TRANSFER') return 'Chuyển khoản';
+    return 'Không rõ';
+  };
+
+  const paymentMethodClass = (method) => {
+    if (method === 'COD') return 'bg-sky-50 text-sky-700 border border-sky-200';
+    if (method === 'BANK_TRANSFER') return 'bg-amber-50 text-amber-700 border border-amber-200';
+    return 'bg-slate-50 text-slate-600 border border-slate-200';
+  };
+
+  const canShowCancelButton = (order) => {
+    if (!order) return false;
+
+    const blockedStatuses = ['CANCELLED', 'DELIVERED', 'COMPLETED', 'RETURN_REQUESTED', 'RETURN_PICKING', 'RETURNED', 'RETURNED_TO_WAREHOUSE'];
+    if (blockedStatuses.includes(order.status)) return false;
+
+    // Customer can cancel until the order enters SHIPPING (shipper has started delivery flow).
+    return ['PENDING', 'PAID', 'CONFIRMED', 'PACKING'].includes(order.status);
   };
 
   const handleUpdateProfile = async (e) => {
@@ -302,34 +539,81 @@ const Profile = () => {
               <div
                 key={order.id}
                 onClick={() => setSelectedOrder(order)}
-                className="border rounded-xl p-4 cursor-pointer hover:shadow"
+                className="border rounded-xl p-4 cursor-pointer hover:shadow flex justify-between items-center transition-all duration-200 hover:border-blue-200 hover:bg-slate-50/20"
               >
-                <div className="flex justify-between">
-                  <span className="font-bold">#{order.orderCode}</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                    order.status === 'PAID' ? 'bg-blue-100 text-blue-800' :
-                    order.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
-                    order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' :
-                    order.status === 'DELIVERED' ? 'bg-purple-100 text-purple-800' :
-                    order.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' :
-                    order.status === 'RETURN_REQUESTED' ? 'bg-orange-100 text-orange-800' :
-                    order.status === 'RETURN_PICKING' ? 'bg-orange-50 text-orange-700' :
-                    order.status === 'RETURNED' ? 'bg-indigo-100 text-indigo-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {order.status}
-                  </span>
-                  <span className="text-red-500">
-                    {new Intl.NumberFormat('vi-VN', {
-                      style: 'currency',
-                      currency: 'VND'
-                    }).format(order.finalPrice)}
-                  </span>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="font-bold text-slate-800">#{order.orderCode}</span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      order.status === 'PENDING' ? 'bg-yellow-50 text-yellow-800 border border-yellow-200/55' :
+                      order.status === 'PAID' ? 'bg-blue-50 text-blue-800 border border-blue-100' :
+                      order.status === 'CONFIRMED' ? 'bg-indigo-50 text-indigo-800 border border-indigo-100' :
+                      order.status === 'SHIPPED' ? 'bg-teal-50 text-teal-800 border border-teal-100' :
+                      order.status === 'DELIVERED' ? 'bg-purple-50 text-purple-800 border border-purple-100' :
+                      order.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' :
+                      order.status === 'RETURN_REQUESTED' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
+                      order.status === 'RETURN_PICKING' ? 'bg-orange-50 text-orange-650 border border-orange-100/50' :
+                      order.status === 'RETURNED' ? 'bg-slate-100 text-slate-700 border border-slate-200' :
+                      'bg-slate-50 text-slate-500'
+                    }`}>
+                      {order.status}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${paymentMethodClass(order.paymentMethod)}`}>
+                      {paymentMethodLabel(order.paymentMethod)}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-4 mt-2">
+                    <span className="text-sm font-semibold text-slate-500">
+                      {new Date(order.createdAt || order.orderDate || Date.now()).toLocaleDateString('vi-VN')}
+                    </span>
+                    <span className="text-red-500 font-bold text-sm">
+                      {new Intl.NumberFormat('vi-VN', {
+                        style: 'currency',
+                        currency: 'VND'
+                      }).format(order.finalPrice || order.totalPrice || 0)}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="text-sm text-gray-500">
-                  {new Date(order.createdAt).toLocaleDateString()}
+                {/* Right side: Chat Quick Action Button */}
+                <div className="flex items-center gap-2 pl-4" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => {
+                      setSelectedOrder(order);
+                      const hasShipper = order.assignedShipper != null || order.shipperId != null || order.shipperName != null;
+                      const status = order.status;
+                      const isShipperUnlocked = hasShipper && (
+                        status === 'SHIPPING' || 
+                        status === 'DELIVERED' || 
+                        status === 'COMPLETED' ||
+                        status === 'RETURN_REQUESTED' ||
+                        status === 'RETURN_PICKING' ||
+                        status === 'RETURNED'
+                      );
+                      
+                      setActiveChatChannel(isShipperUnlocked ? 'CUSTOMER_SHIPPER' : 'CUSTOMER_ADMIN');
+                      setShowChatModal(true);
+                      
+                      setUnreadCountsByOrder(prev => ({
+                        ...prev,
+                        [order.id]: 0
+                      }));
+                    }}
+                    className={`relative p-3 rounded-full transition-all duration-300 flex items-center justify-center border shadow-sm ${
+                      unreadCountsByOrder[order.id] > 0
+                        ? 'bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100 scale-105 shadow-rose-100'
+                        : 'bg-white border-slate-100 text-slate-500 hover:text-blue-500 hover:border-blue-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <MessageSquare size={18} />
+                    
+                    {unreadCountsByOrder[order.id] > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border border-white shadow animate-bounce">
+                        {unreadCountsByOrder[order.id]}
+                      </span>
+                    )}
+                  </button>
                 </div>
               </div>
             ))}
@@ -372,7 +656,12 @@ const Profile = () => {
             <p className="text-sm text-slate-700">SĐT: {selectedOrder.customerPhone || user?.phone || 'N/A'}</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="mt-2 text-sm text-slate-700">Phương thức: {selectedOrder.paymentMethod || 'N/A'}</p>
+            <div className="mt-2 flex items-center gap-2 text-sm text-slate-700">
+              <span>Phương thức:</span>
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${paymentMethodClass(selectedOrder.paymentMethod)}`}>
+                {paymentMethodLabel(selectedOrder.paymentMethod)}
+              </span>
+            </div>
             <p className="text-sm text-slate-700">Trạng thái: {selectedOrder.paymentStatus || 'N/A'}</p>
             <div className="flex flex-wrap gap-2 mt-2">
               {selectedOrder.paymentMethod === 'BANK_TRANSFER' && selectedOrder.paymentStatus === 'UNPAID' && selectedOrder.status !== 'CANCELLED' && (
@@ -383,7 +672,16 @@ const Profile = () => {
                   <CreditCard size={14} /> THANH TOÁN NGAY
                 </button>
               )}
-              {selectedOrder.status !== 'CANCELLED' && (selectedOrder.status === 'PENDING' || selectedOrder.paymentStatus === 'UNPAID') && (
+              {/* Nút đổi sang COD - hiển thị khi đang dùng chuyển khoản nhưng chưa thanh toán */}
+              {selectedOrder.paymentMethod === 'BANK_TRANSFER' && selectedOrder.paymentStatus === 'UNPAID' && selectedOrder.status !== 'CANCELLED' && (
+                <button
+                  onClick={() => handleSwitchToCod(selectedOrder)}
+                  className="flex items-center gap-2 rounded-lg border border-emerald-500 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors shadow-sm"
+                >
+                  🔄 ĐỔI SANG NHẬN HÀNG
+                </button>
+              )}
+              {canShowCancelButton(selectedOrder) && (
                 <button
                   onClick={() => handleCancelOrder(selectedOrder.id)}
                   className="flex items-center gap-2 rounded-lg border border-red-500 bg-white px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors shadow-sm"
@@ -431,7 +729,113 @@ const Profile = () => {
           }).format(selectedOrder.finalPrice || selectedOrder.totalPrice || 0)}</span>
         </div>
 
-        {(selectedOrder.status === 'DELIVERED' || selectedOrder.status === 'COMPLETED') && canReturn(selectedOrder) && (
+        {/* Chat Cards Section */}
+        <div className="mt-8 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <h3 className="text-sm font-black uppercase tracking-wider text-slate-500 mb-6 flex items-center gap-2">
+            <span>💬</span> Trò chuyện Hỗ trợ & Vận chuyển
+          </h3>
+          <div className="flex items-center gap-8 justify-center py-6 px-4 bg-slate-50/50 rounded-3xl border border-slate-100/80">
+            {/* Chat với Admin Icon Button */}
+            <button 
+              onClick={() => {
+                setActiveChatChannel('CUSTOMER_ADMIN');
+                setShowChatModal(true);
+                setUnreadAdminCount(0);
+              }}
+              className="flex flex-col items-center gap-3 group focus:outline-none"
+            >
+              <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-200/80 group-hover:shadow-blue-300/80 transition-all duration-300 group-hover:scale-110 active:scale-95 relative">
+                <Shield size={26} className="group-hover:rotate-12 transition-transform duration-300" />
+                
+                {unreadAdminCount > 0 ? (
+                  <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md animate-bounce">
+                    {unreadAdminCount}
+                  </span>
+                ) : (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white"></span>
+                  </span>
+                )}
+              </div>
+              <div className="text-center">
+                <span className="block text-xs font-black uppercase tracking-wider text-slate-700 group-hover:text-blue-600 transition-colors">Admin Hỗ Trợ</span>
+                <span className="block text-[10px] text-slate-400 font-medium mt-0.5">Trực tuyến</span>
+              </div>
+            </button>
+
+            {/* Chat với Shipper Icon Button */}
+            {(() => {
+              const hasShipper = selectedOrder.assignedShipper != null || selectedOrder.shipperId != null || selectedOrder.shipperName != null;
+              const status = selectedOrder.status;
+              const isUnlocked = hasShipper && (
+                status === 'SHIPPING' || 
+                status === 'DELIVERED' || 
+                status === 'COMPLETED' ||
+                status === 'RETURN_REQUESTED' ||
+                status === 'RETURN_PICKING' ||
+                status === 'RETURNED'
+              );
+
+              if (isUnlocked) {
+                return (
+                  <button 
+                    onClick={() => {
+                      setActiveChatChannel('CUSTOMER_SHIPPER');
+                      setShowChatModal(true);
+                      setUnreadShipperCount(0);
+                    }}
+                    className="flex flex-col items-center gap-3 group focus:outline-none"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-amber-200/80 group-hover:shadow-amber-300/80 transition-all duration-300 group-hover:scale-110 active:scale-95 relative">
+                      <Truck size={26} className="group-hover:translate-x-0.5 transition-transform duration-300" />
+                      
+                      {unreadShipperCount > 0 ? (
+                        <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md animate-bounce">
+                          {unreadShipperCount}
+                        </span>
+                      ) : (
+                        <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white"></span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <span className="block text-xs font-black uppercase tracking-wider text-slate-700 group-hover:text-amber-600 transition-colors">Shipper</span>
+                      <span className="block text-[10px] text-emerald-600 font-bold mt-0.5">Đã kết nối</span>
+                    </div>
+                  </button>
+                );
+              }
+
+              return null;
+            })()}
+          </div>
+        </div>
+
+        {selectedOrder.status === 'DELIVERED' && (
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-end gap-4 border-t border-slate-100 pt-6">
+            <button 
+              onClick={() => handleNotReceived(selectedOrder)}
+              className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-rose-500 text-rose-500 font-bold hover:bg-rose-50 transition-colors shadow-sm text-sm"
+            >
+              Tôi chưa nhận được hàng
+            </button>
+            <button 
+              onClick={() => {
+                setRatingOrder(selectedOrder);
+                setRatingStars(5);
+                setShowRatingModal(true);
+              }}
+              className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold hover:from-emerald-600 hover:to-teal-700 transition-all shadow-md shadow-emerald-100 text-sm"
+            >
+              Đã nhận được hàng
+            </button>
+          </div>
+        )}
+
+        {selectedOrder.status === 'COMPLETED' && canReturn(selectedOrder) && (
           <div className="mt-4 flex justify-end">
             <button 
               onClick={() => handleRequestReturn(selectedOrder)}
@@ -458,6 +862,101 @@ const Profile = () => {
           onPaid={handlePaid} 
           onCancel={() => setShowQRModal(false)}
         />
+      )}
+
+      {/* Real-time Chat Modal */}
+      {showChatModal && selectedOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md" onClick={() => setShowChatModal(false)}></div>
+          <div className="relative w-full max-w-xl animate-in zoom-in-95 duration-200 flex flex-col gap-4">
+            
+            {/* Elegant Header Above the Chat Box */}
+            <div className="flex items-center justify-between text-slate-800 bg-white/95 backdrop-blur px-6 py-4 rounded-2xl shadow-sm border border-slate-100/50">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">💬</span>
+                <span className="font-bold text-slate-800 text-sm md:text-base">Trò chuyện Hỗ trợ & Vận chuyển</span>
+              </div>
+              <button 
+                onClick={() => setShowChatModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-150 text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-lg font-bold transition-all focus:outline-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Chat Box Container */}
+            <div className="h-[500px]">
+              <OrderChat 
+                order={selectedOrder} 
+                currentUser={user} 
+                role="CUSTORMER" 
+                initialChannel={activeChatChannel} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Star Rating Modal for Completion */}
+      {showRatingModal && ratingOrder && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md" onClick={() => setShowRatingModal(false)}></div>
+          <div className="relative w-full max-w-md bg-white rounded-[32px] shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100/50">
+            <h3 className="text-lg font-black text-slate-800 text-center mb-2">Đánh giá đơn hàng</h3>
+            <p className="text-xs text-slate-400 text-center mb-6 uppercase tracking-wider font-bold">
+              Đơn hàng #{ratingOrder.orderCode}
+            </p>
+
+            {/* Star selector */}
+            <div className="flex items-center justify-center gap-2 mb-8">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setRatingStars(star)}
+                  className="p-1 focus:outline-none transition-transform active:scale-90 hover:scale-115"
+                >
+                  <svg
+                    className={`w-10 h-10 transition-colors ${
+                      star <= ratingStars ? 'text-amber-400 fill-amber-400' : 'text-slate-200'
+                    }`}
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+
+            {/* Helper text based on star rating */}
+            <p className="text-center text-xs font-bold text-slate-500 mb-8 min-h-[16px]">
+              {ratingStars === 5 && "⭐⭐⭐⭐⭐ Tuyệt vời! Rất hài lòng."}
+              {ratingStars === 4 && "⭐⭐⭐⭐ Rất tốt! Hài lòng."}
+              {ratingStars === 3 && "⭐⭐⭐ Bình thường! Tạm được."}
+              {ratingStars === 2 && "⭐⭐ Không hài lòng!"}
+              {ratingStars === 1 && "⭐ Rất không hài lòng!"}
+            </p>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowRatingModal(false)}
+                className="flex-1 py-3.5 rounded-2xl border border-slate-200 text-slate-500 font-bold hover:bg-slate-50 transition-colors text-sm"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={handleCompleteOrderWithRating}
+                className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold hover:from-emerald-600 hover:to-teal-700 transition-all shadow-md shadow-emerald-100 text-sm"
+              >
+                Hoàn thành
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -29,6 +31,8 @@ public class OrderShipping {
 
     @OneToOne
     @JoinColumn(name = "order_id", nullable = false, unique = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Order order;
 
     @Column(nullable = false, columnDefinition = "TEXT")

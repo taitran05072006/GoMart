@@ -35,7 +35,7 @@ import QRPaymentModal from '../components/checkout/QRPaymentModal';
 /* ─────────── Main Checkout ─────────── */
 const Checkout = () => {
   const { cartItems, fetchCart } = useContext(CartContext);
-  const { user } = useContext(AuthContext);
+  const { user, refreshUser } = useContext(AuthContext);
   const { checkoutVouchers, fetchCheckoutVouchers } = useContext(VoucherContext);
   const navigate = useNavigate();
   const location = useLocation();
@@ -64,6 +64,7 @@ const Checkout = () => {
   const [shippingDiscountAmount, setShippingDiscountAmount] = useState(0);
   const [useStarsInput, setUseStarsInput] = useState(0);
   const [starDiscount, setStarDiscount] = useState(0);
+  const [useAllStars, setUseAllStars] = useState(false);
   const [shippingLocations, setShippingLocations] = useState([]);
 
   const selectedItems = cartItems.filter((item) => item.ticked);
@@ -100,6 +101,9 @@ const Checkout = () => {
     if (user?.id) {
       const productIds = selectedItems.map(item => item.productId || item.product?.id);
       fetchCheckoutVouchers(user.id, selectedSubtotal, productIds);
+      if (refreshUser) {
+        refreshUser();
+      }
     }
 
     paymentService.getMethods().then((methods) => {
@@ -308,15 +312,26 @@ const Checkout = () => {
       </div>
     );
   };
-  const handleApplyStars = () => {
-    const stars = parseInt(useStarsInput) || 0;
-    if (stars < 0) return toast.error('Số sao không hợp lệ');
-    if (stars > (user?.rewardStars || 0)) return toast.error('Bạn không đủ sao');
-
-    // Quy đổi: 1 sao = 1000 VND
-    setStarDiscount(stars * 1000);
-    toast.success(`Đã áp dụng ${stars} sao!`);
+  const handleToggleUseAllStars = (checked) => {
+    setUseAllStars(checked);
+    if (!checked) {
+      setUseStarsInput(0);
+      setStarDiscount(0);
+    } else {
+      toast.success('Đã áp dụng toàn bộ sao tích lũy!');
+    }
   };
+
+  // Auto apply/recalculate stars when useAllStars is enabled
+  useEffect(() => {
+    if (useAllStars) {
+      const maxPayable = selectedSubtotal - discountAmount + (shippingFee - shippingDiscountAmount);
+      const maxStarsNeeded = Math.ceil(Math.max(0, maxPayable) / 1000);
+      const starsToUse = Math.max(0, Math.min(user?.rewardStars || 0, maxStarsNeeded));
+      setUseStarsInput(starsToUse);
+      setStarDiscount(starsToUse * 1000);
+    }
+  }, [useAllStars, selectedSubtotal, discountAmount, shippingFee, shippingDiscountAmount, user?.rewardStars]);
 
   // Auto apply voucher when voucherCodeInput changes and it comes from state
   useEffect(() => {
@@ -336,6 +351,14 @@ const Checkout = () => {
     setIsSubmitting(true);
 
     try {
+      const parsedStars = Number.isFinite(Number(useStarsInput))
+        ? Math.max(0, Math.floor(Number(useStarsInput)))
+        : 0;
+
+      const maxPayableBeforeStars = Math.max(0, selectedSubtotal - discountAmount + (shippingFee - shippingDiscountAmount));
+      const maxStarsByAmount = Math.floor(maxPayableBeforeStars / 1000);
+      const cappedStars = Math.min(parsedStars, user?.rewardStars || 0, maxStarsByAmount);
+
       const orderRequest = {
         userId: user.id,
         items: selectedItems.map((item) => ({
@@ -353,7 +376,7 @@ const Checkout = () => {
         district: user.district,
         ward: user.ward,
         houseNumber: user.houseNumber,
-        useStars: parseInt(useStarsInput) || 0,
+        useStars: cappedStars,
       };
 
       if (orderRequest.items.some((item) => !item.productId)) {
@@ -402,7 +425,12 @@ const Checkout = () => {
       await fetchCart();
       navigate('/profile?tab=orders');
     } catch (err) {
-      toast.error(err.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+      toast.error(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Có lỗi xảy ra. Vui lòng thử lại.'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -539,31 +567,42 @@ const Checkout = () => {
                 <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <span>⭐</span> Tích Lũy Sao
                 </h2>
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-amber-800">
-                      Sao của bạn: <span className="font-bold">{user?.rewardStars || 0} sao</span>
-                    </p>
-                    <p className="text-xs text-amber-700 italic">1 sao = 1.000 VND</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-[24px] p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900">
+                        Sao tích lũy khả dụng: <span className="font-extrabold text-amber-600 text-lg">{user?.rewardStars || 0} sao</span>
+                      </p>
+                      <p className="text-xs text-amber-700 font-medium mt-0.5">Quy đổi: 1 sao = 1.000 VND</p>
+                    </div>
+                    {/* Switch Toggle Switch */}
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={useAllStars}
+                        onChange={(e) => handleToggleUseAllStars(e.target.checked)}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-amber-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-amber-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                      <span className="ml-3 text-sm font-bold text-amber-900">Áp dụng</span>
+                    </label>
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max={user?.rewardStars || 0}
-                      placeholder="Nhập số sao muốn dùng"
-                      value={useStarsInput}
-                      onChange={(e) => setUseStarsInput(e.target.value)}
-                      className="flex-1 border border-amber-300 rounded-lg p-2 focus:ring-2 focus:ring-amber-500 font-medium"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleApplyStars}
-                      className="bg-amber-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-amber-600 transition-colors"
-                    >
-                      Dùng Sao
-                    </button>
-                  </div>
+
+                  {useAllStars && (
+                    <div className="mt-4 bg-amber-100/50 border border-amber-200/80 rounded-xl p-4 flex items-center justify-between text-amber-900 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">✨</span>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Đã áp dụng tự động</p>
+                          <p className="text-sm font-bold mt-0.5">Sử dụng: <span className="text-base font-extrabold">{useStarsInput} sao</span></p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Giảm giá</p>
+                        <p className="text-base font-extrabold text-amber-600">-{fmt.format(starDiscount)}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </form>

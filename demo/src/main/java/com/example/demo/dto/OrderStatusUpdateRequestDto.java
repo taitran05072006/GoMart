@@ -15,4 +15,5 @@ import lombok.NoArgsConstructor;
 public class OrderStatusUpdateRequestDto {
     private String status;
     private String reason; // Optional - dùng cho cancel/return
+    private Integer rating; // Optional - dùng cho đánh giá sao
 }

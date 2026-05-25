@@ -10,8 +10,8 @@ const orderService = {
   getOrderById: async (id) => {
     return axiosClient.get(`/orders/${id}`);
   },
-  updateStatus: async (id, status) => {
-    return axiosClient.put(`/orders/${id}/status`, { status });
+  updateStatus: async (id, status, rating = null) => {
+    return axiosClient.put(`/orders/${id}/status`, { status, rating });
   },
   confirmCodOrder: async (id) => {
     return axiosClient.patch(`/orders/${id}/admin/confirm-cod`);

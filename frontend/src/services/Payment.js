@@ -34,6 +34,10 @@ const paymentService = {
     getPaymentSession: async (transactionCode) => {
         const res = await axiosClient.get(`/payments/session/${transactionCode}`);
         return pickPayload(res);
+    },
+    switchToCod: async (orderId) => {
+        const res = await axiosClient.patch(`/orders/${orderId}/payment/switch-to-cod`);
+        return pickPayload(res);
     }
 }
 export default paymentService;

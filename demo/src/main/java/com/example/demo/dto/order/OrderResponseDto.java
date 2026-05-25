@@ -33,4 +33,5 @@ public class OrderResponseDto {
     private Double shippingDiscount;
     private String shippingVoucherCode;
     private LocalDateTime actualDeliveryTime;
+    private Integer rating;
 }

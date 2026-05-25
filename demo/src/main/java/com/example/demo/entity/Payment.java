@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -25,6 +27,8 @@ public class Payment {
     // liên kết với order (optional vì có thể thanh toán trước khi tạo order)
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", unique = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Order order;
 
     // phương thức thanh toán

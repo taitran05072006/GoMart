@@ -3,6 +3,8 @@ package com.example.demo.dto.user;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 @Builder
 public class AdminUserResponseDto {
@@ -12,4 +14,5 @@ public class AdminUserResponseDto {
     private String phone;
     private String address;
     private String role;
+    private LocalDateTime createdAt;
 }

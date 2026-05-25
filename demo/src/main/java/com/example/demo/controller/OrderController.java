@@ -78,7 +78,7 @@ public class OrderController {
         OrderStatus newStatus = OrderStatus.valueOf(request.getStatus());
         return ApiResponse.success(
                 "Trạng thái đơn hàng đã được cập nhật",
-                orderService.updateStatus(id, newStatus)
+                orderService.updateStatus(id, newStatus, request.getRating())
         );
     }
 

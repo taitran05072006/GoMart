@@ -17,6 +17,8 @@ public enum OrderStatus {
     CANCELLED("Đã hủy"),
     RETURN_REQUESTED("Yêu cầu hoàn trả"),
     RETURN_PICKING("Đang lấy hàng hoàn"),
+    RETURN_AWAITING_ADMIN_CONFIRM("Chờ admin xác nhận hàng về kho"),
+    RETURNED_TO_WAREHOUSE("Hàng đã về kho hoàn"),
     RETURNED("Đã hoàn trả");
 
     private final String displayName;
@@ -26,12 +28,14 @@ public enum OrderStatus {
         Map.entry(PAID, EnumSet.of(CONFIRMED, CANCELLED)),
         Map.entry(CONFIRMED, EnumSet.of(PACKING, CANCELLED)),
         Map.entry(PACKING, EnumSet.of(SHIPPING, CANCELLED)),
-        Map.entry(SHIPPING, EnumSet.of(DELIVERED, CANCELLED)),
+        Map.entry(SHIPPING, EnumSet.of(DELIVERED, CANCELLED, RETURN_AWAITING_ADMIN_CONFIRM)),
         Map.entry(DELIVERED, EnumSet.of(COMPLETED, RETURN_REQUESTED, CANCELLED)),
-        Map.entry(COMPLETED, EnumSet.of(RETURN_REQUESTED)), // User can request return after completion
+        Map.entry(COMPLETED, EnumSet.of(RETURN_REQUESTED)),
         Map.entry(CANCELLED, EnumSet.noneOf(OrderStatus.class)),
         Map.entry(RETURN_REQUESTED, EnumSet.of(RETURN_PICKING, CANCELLED)),
-        Map.entry(RETURN_PICKING, EnumSet.of(RETURNED, CANCELLED)),
+        Map.entry(RETURN_PICKING, EnumSet.of(RETURN_AWAITING_ADMIN_CONFIRM, CANCELLED)),
+        Map.entry(RETURN_AWAITING_ADMIN_CONFIRM, EnumSet.of(RETURNED_TO_WAREHOUSE, CANCELLED)),
+        Map.entry(RETURNED_TO_WAREHOUSE, EnumSet.of(RETURNED, COMPLETED, CANCELLED)),
         Map.entry(RETURNED, EnumSet.noneOf(OrderStatus.class))
     );
     OrderStatus(String displayName) {

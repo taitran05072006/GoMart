@@ -8,6 +8,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -52,14 +54,20 @@ public class Order {
     private User assignedShipper;
 
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Payment payment;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<OrderItem> items;
 
     // LƯU Ý: Bỏ @JoinColumn(name = "shipping_id") vì DB của bạn không có cột này
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private OrderShipping shipping;
 
     @Column(name = "total_price", nullable = false)
@@ -88,6 +96,9 @@ public class Order {
 
     @Column(name = "stars_awarded")
     private Integer starsAwarded;
+
+    @Column(name = "rating")
+    private Integer rating;
 
     @Column(name = "shipping_discount", nullable = false)
     @Builder.Default

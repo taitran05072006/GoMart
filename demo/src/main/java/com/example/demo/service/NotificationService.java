@@ -87,7 +87,7 @@ public class NotificationService {
         String orderRef = order.getOrderCode() != null ? order.getOrderCode() : ("#" + order.getId());
         String fromLabel = fromStatus != null ? fromStatus.name() : "UNKNOWN";
         String toLabel = toStatus.name();
-        String title = "ập nhật đơn hàng";
+        String title = "Cập nhật đơn hàng";
         String message = "Đơn hàng " + orderRef + " đã chuyển từ " + fromLabel + " sang " + toLabel + ".";
         sendToUser(order.getUser(), title, message, "/profile?tab=orders");
     }
@@ -116,7 +116,7 @@ public class NotificationService {
                 ? order.getUser().getName()
                 : "Khach hang";
 
-        String title = "ạn được giao đơn mới";
+        String title = "Bạn được giao đơn mới";
         String message = "Đơn " + orderRef + " của " + customerName + " vừa được giao cho bạn.";
         sendToUser(order.getAssignedShipper(), title, message, "/shipper/orders");
     }

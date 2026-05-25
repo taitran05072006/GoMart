@@ -259,6 +259,51 @@ public class PaymentService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Đổi phương thức thanh toán từ BANK_TRANSFER sang COD.
+     * Chỉ cho phép khi đơn hàng chưa thanh toán và đang ở trạng thái PENDING.
+     */
+    @Transactional
+    public PaymentResponseDto switchPaymentToCod(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng"));
+
+        Payment payment = paymentRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin thanh toán"));
+
+        // Chỉ cho phép đổi nếu phương thức là BANK_TRANSFER
+        if (payment.getMethod() != PaymentMethod.BANK_TRANSFER) {
+            throw new BadRequestException("Chỉ có thể đổi khi phương thức hiện tại là chuyển khoản ngân hàng");
+        }
+
+        // Chỉ cho phép đổi nếu chưa thanh toán
+        if (payment.getStatus() == PaymentStatus.PAID) {
+            throw new BadRequestException("Đơn hàng đã thanh toán, không thể đổi phương thức");
+        }
+
+        // Chỉ cho phép khi đơn hàng đang PENDING hoặc chưa xử lý
+        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.PAID) {
+            throw new BadRequestException("Chỉ có thể đổi phương thức thanh toán khi đơn hàng đang chờ xử lý");
+        }
+
+        // Cập nhật payment sang COD
+        payment.setMethod(PaymentMethod.COD);
+        payment.setStatus(PaymentStatus.UNPAID);
+        payment.setQrCodeUrl(null);
+        payment.setTransactionCode(null);
+        payment.setFailureReason(null);
+
+        // Đảm bảo order trở về trạng thái PENDING nếu đang ở PAID (do chuyển khoản tạo ra)
+        if (order.getStatus() == OrderStatus.PAID) {
+            order.setStatus(OrderStatus.PENDING);
+            order.setPaymentStatus(PaymentStatus.UNPAID);
+            orderRepository.save(order);
+        }
+
+        log.info("Đã chuyển phương thức thanh toán đơn {} từ BANK_TRANSFER sang COD", order.getOrderCode());
+        return mapToDto(paymentRepository.save(payment));
+    }
+
     @Transactional
     public PaymentResponseDto prepareTransfer(OrderRequestDto request) {
         // Luồng thanh toán trước khi tạo đơn hàng (nếu có)

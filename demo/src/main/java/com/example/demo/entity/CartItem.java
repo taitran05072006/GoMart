@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 @Data
 @NoArgsConstructor
@@ -24,6 +26,8 @@ public class CartItem {
     @ManyToOne
     @JoinColumn(name = "cart_id")
     @JsonBackReference
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Cart cart;
 
     @ManyToOne
