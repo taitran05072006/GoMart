@@ -819,7 +819,7 @@ public class OrderService {
                 product.setReviews(currentReviews + 1);
                 productRepository.save(product);
 
-                log.info("Đã cập nhật rating cho sản phẩm {}: {} sao dựa trên {} lượt đánh giá", 
+                log.info("Đã cập nhật rating cho sản phẩm {}: {} sao dựa trên {} lượt đánh giá",
                         product.getName(), newRating, currentReviews + 1);
             }
         }
@@ -832,7 +832,7 @@ public class OrderService {
 
         boolean isAdmin = order.getUser().getRole() == Role.ADMIN;
         try {
-            statusValidator.validateCancel(order, isAdmin);
+            statusValidator.validateCancel(order, isAdmin, false);
         } catch (InvalidOrderStatusTransitionException e) {
             throw new BadRequestException(e.getMessage());
         }
