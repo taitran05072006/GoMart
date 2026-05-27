@@ -19,8 +19,14 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     @Query(value = "UPDATE categories SET is_deleted = false WHERE is_deleted IS NULL", nativeQuery = true)
     int normalizeNullDeleted();
 
+    @Query(value = "SELECT COUNT(*) FROM categories WHERE is_deleted IS NULL", nativeQuery = true)
+    long countNullDeleted();
+
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "UPDATE categories SET is_active = true WHERE is_active IS NULL", nativeQuery = true)
     int normalizeNullActive();
+
+    @Query(value = "SELECT COUNT(*) FROM categories WHERE is_active IS NULL", nativeQuery = true)
+    long countNullActive();
 }

@@ -20,8 +20,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query(value = "UPDATE users SET reward_stars = 0 WHERE reward_stars IS NULL", nativeQuery = true)
     int normalizeNullRewardStars();
 
+    @Query(value = "SELECT COUNT(*) FROM users WHERE reward_stars IS NULL", nativeQuery = true)
+    long countNullRewardStars();
+
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "UPDATE users SET tier = 'MEMBER' WHERE tier IS NULL", nativeQuery = true)
     int normalizeNullTiers();
+
+    @Query(value = "SELECT COUNT(*) FROM users WHERE tier IS NULL", nativeQuery = true)
+    long countNullTiers();
 }

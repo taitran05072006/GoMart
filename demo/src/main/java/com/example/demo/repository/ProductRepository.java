@@ -50,10 +50,16 @@ AND (:maxPrice IS NULL OR p.price <= :maxPrice)
     @Query(value = "UPDATE products SET version = 0 WHERE version IS NULL", nativeQuery = true)
     int normalizeNullVersions();
 
+    @Query(value = "SELECT COUNT(*) FROM products WHERE version IS NULL", nativeQuery = true)
+    long countNullVersions();
+
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "UPDATE products SET is_deleted = false WHERE is_deleted IS NULL", nativeQuery = true)
     int normalizeNullDeleted();
+
+    @Query(value = "SELECT COUNT(*) FROM products WHERE is_deleted IS NULL", nativeQuery = true)
+    long countNullDeleted();
 
     @Transactional
     @Modifying
