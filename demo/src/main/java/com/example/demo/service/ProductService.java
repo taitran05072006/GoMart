@@ -186,6 +186,7 @@ public class ProductService {
         List<Inventory> activeInventories = inventoryRepository.findAll().stream()
                 .filter(i -> i.getStore() != null && i.getStore().getId().equals(storeId))
                 .filter(i -> Boolean.TRUE.equals(i.getIsSelling()))
+                .filter(i -> i.getQuantity() != null && i.getQuantity() > 0)
                 .collect(Collectors.toList());
 
         Map<Long, Inventory> inventoryMap = activeInventories.stream()
