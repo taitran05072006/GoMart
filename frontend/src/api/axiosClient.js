@@ -36,6 +36,19 @@ axiosClient.interceptors.request.use(
     if (token && !isPublicAuthEndpoint) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser && storedUser !== 'null' && storedUser !== 'undefined') {
+        const u = JSON.parse(storedUser);
+        if (u && u.id && String(u.id) !== 'null') config.headers['X-User-Id'] = String(u.id);
+      }
+      const impersonatedStoreId = localStorage.getItem('impersonatedStoreId');
+      if (impersonatedStoreId && impersonatedStoreId !== 'null' && impersonatedStoreId !== 'undefined') {
+        config.headers['X-Impersonate-Store-Id'] = impersonatedStoreId;
+      }
+    } catch (err) {
+      // ignore
+    }
     return config;
   },
   (error) => {
@@ -45,7 +58,13 @@ axiosClient.interceptors.request.use(
 
 axiosClient.interceptors.response.use(
   (response) => {
-    return response.data;
+    const data = response.data;
+    if (data && data.success === false) {
+      const err = new Error(data.message || 'Có lỗi xảy ra');
+      err.data = data;
+      return Promise.reject(err);
+    }
+    return data;
   },
   (error) => {
     const status = error?.response?.status;

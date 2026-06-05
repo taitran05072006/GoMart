@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { ArrowLeft } from 'lucide-react';
 import categoryService from '../../services/categoryService';
 
 const emptyForm = {
@@ -87,6 +88,16 @@ const AdminCategoryForm = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm hover:bg-slate-50 hover:shadow-md"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Quay lại
+        </button>
+      </div>
+
       <div className="rounded-3xl bg-slate-950 p-6 text-white">
         <p className="text-xs uppercase tracking-[0.3em] text-white/60">Quản lý danh mục</p>
         <h2 className="mt-2 text-2xl font-black">{isEdit ? 'Chỉnh sửa danh mục' : 'Tạo danh mục mới'}</h2>

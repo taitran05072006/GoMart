@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Trash2 } from 'lucide-react';
+import { Search } from 'lucide-react';
 import authService from '../../services/authService';
 
 const AdminCustomers = () => {
@@ -17,7 +17,7 @@ const AdminCustomers = () => {
       setCustomers(Array.isArray(data) ? data : []);
     } catch (fetchError) {
       console.error(fetchError);
-      setError('Khong the tai danh sach khach hang.');
+      setError('Không thể tải danh sách khách hàng.');
     } finally {
       setLoading(false);
     }
@@ -34,39 +34,14 @@ const AdminCustomers = () => {
     }
 
     return customers.filter((customer) =>
-      [customer.name, customer.email, customer.phone, customer.role]
+      [customer.name, customer.email, customer.phone, customer.role, customer.storeName]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(keyword))
     );
   }, [customers, search]);
 
-  const handleRoleChange = async (userId, role) => {
-    try {
-      const response = await authService.updateUserRole(userId, role);
-      const updated = response?.data?.data || response?.data || response;
-      setCustomers((current) => current.map((customer) => (customer.id === userId ? updated : customer)));
-    } catch (updateError) {
-      console.error(updateError);
-      alert('Vai trò cập nhật thất bại');
-    }
-  };
-
-  const handleDelete = async (userId) => {
-    if (!window.confirm('Xóa khách hàng này?')) {
-      return;
-    }
-
-    try {
-      await authService.deleteAdminCustomer(userId);
-      setCustomers((current) => current.filter((customer) => customer.id !== userId));
-    } catch (deleteError) {
-      console.error(deleteError);
-      alert('Không thể xóa khách hàng');
-    }
-  };
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm">
         <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Hệ thống</p>
         <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-900">Quản lý khách hàng</h2>
@@ -96,7 +71,6 @@ const AdminCustomers = () => {
                 <th className="px-5 py-4 text-left font-semibold">Số điện thoại</th>
                 <th className="px-5 py-4 text-left font-semibold">Địa chỉ</th>
                 <th className="px-5 py-4 text-center font-semibold">Vai trò</th>
-                <th className="px-5 py-4 text-right font-semibold">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -107,21 +81,21 @@ const AdminCustomers = () => {
                   <td className="px-5 py-4 text-slate-700">{customer.phone || '-'}</td>
                   <td className="px-5 py-4 text-slate-600">{customer.address || '-'}</td>
                   <td className="px-5 py-4 text-center">
-                    <select
-                      value={customer.role || 'CUSTORMER'}
-                      onChange={(event) => handleRoleChange(customer.id, event.target.value)}
-                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700"
-                    >
-                      <option value="CUSTORMER">Khách hàng</option>
-                      <option value="ADMIN">Quản trị viên</option>
-                      <option value="SHIPPER">SHIPPER</option>
-                    </select>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center justify-end gap-3">
-                      <button onClick={() => handleDelete(customer.id)} className="rounded-full p-2 text-rose-600 transition hover:bg-rose-50">
-                        <Trash2 size={18} />
-                      </button>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${customer.role === 'SUPER_ADMIN' ? 'bg-amber-100 text-amber-700' : customer.role === 'STORE_ADMIN' ? 'bg-blue-100 text-blue-700' : customer.role === 'SHIPPER' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-50 text-slate-600'}`}>
+                        {customer.role === 'SUPER_ADMIN'
+                          ? 'SUPER_ADMIN'
+                          : customer.role === 'STORE_ADMIN'
+                            ? 'STORE_ADMIN'
+                              : customer.role === 'SHIPPER'
+                                ? 'SHIPPER'
+                                : 'CUSTOMER'}
+                      </span>
+                      {customer.role === 'STORE_ADMIN' && customer.storeName && (
+                        <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full">
+                          {customer.storeName}
+                        </span>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -129,7 +103,7 @@ const AdminCustomers = () => {
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="px-5 py-12 text-center text-slate-500">
+                  <td colSpan="5" className="px-5 py-12 text-center text-slate-500">
                     Không tìm thấy khách hàng nào.
                   </td>
                 </tr>
@@ -138,6 +112,7 @@ const AdminCustomers = () => {
           </table>
         )}
       </div>
+
     </div>
   );
 };

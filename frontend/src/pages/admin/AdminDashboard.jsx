@@ -1,12 +1,13 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DollarSign, ShoppingBag, Users, Package,
-  TrendingUp, TrendingDown, ChevronDown, ArrowRight
+  TrendingUp, TrendingDown, ChevronDown, Building2
 } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
 import productService from '../../services/productService';
 import orderService from '../../services/orderService';
+import { AuthContext } from '../../context/AuthContext';
 
 /* ─── helpers ─── */
 const fmt = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
@@ -155,35 +156,44 @@ const AdminDashboard = () => {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [isCustomRange, setIsCustomRange] = useState(false);
+  const { user, impersonatedStoreId } = useContext(AuthContext);
+
+  const fetchDashboardStats = async () => {
+    setLoading(true);
+    try {
+      const targetStoreId = user?.role === 'STORE_ADMIN' && user?.storeId ? user.storeId : impersonatedStoreId;
+      const reqs = [
+        orderService.getAllOrders(),
+        targetStoreId ? productService.getByStoreId(targetStoreId) : productService.getAll(),
+        user?.role === 'SUPER_ADMIN' ? axiosClient.get('/users/admin/customers') : Promise.resolve({ data: { data: [] } }),
+      ];
+
+      const [ordersRes, productsRes, usersRes] = await Promise.all(reqs);
+
+      const orderList = ordersRes?.data?.data || ordersRes?.data || ordersRes || [];
+      const productList = productsRes?.data?.data || productsRes?.data || productsRes || [];
+      const userList = usersRes?.data?.data || usersRes?.data || usersRes || [];
+
+      setOrders(Array.isArray(orderList) ? orderList : []);
+      setProducts(Array.isArray(productList) ? productList : []);
+      setUsers(Array.isArray(userList) ? userList : []);
+    } catch (err) {
+      console.error('Failed to load dashboard stats:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const [ordersRes, productsRes, usersRes] = await Promise.all([
-          orderService.getAllOrders(),
-          productService.getAll(),
-          axiosClient.get('/users/admin/customers'),
-        ]);
-        if (!mounted) return;
-        const orderList = ordersRes?.data?.data || ordersRes?.data || ordersRes || [];
-        const productList = productsRes?.data?.data || productsRes?.data || productsRes || [];
-        const userList = usersRes?.data?.data || usersRes?.data || usersRes || [];
-        setOrders(Array.isArray(orderList) ? orderList : []);
-        setProducts(Array.isArray(productList) ? productList : []);
-        setUsers(Array.isArray(userList) ? userList : []);
-      } catch (err) {
-        console.error('Dashboard load error', err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false; };
-  }, []);
+    if (user) fetchDashboardStats();
+  }, [timeRange, customFrom, customTo, impersonatedStoreId, user]);
 
   /* ── derived data ── */
+  const selectedStoreId = user?.role === 'STORE_ADMIN' && user?.storeId ? user.storeId : impersonatedStoreId;
+  const filteredOrders = useMemo(() => {
+    if (!selectedStoreId) return orders;
+    return orders.filter(o => String(o.storeId) === String(selectedStoreId));
+  }, [orders, selectedStoreId]);
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -214,22 +224,46 @@ const AdminDashboard = () => {
     return { start, end, label: timeRange.label };
   }, [isCustomRange, customFrom, customTo, today, timeRange]);
 
-  // Revenue only counts completed orders.
+  const previousRange = useMemo(() => {
+    const { start, end } = effectiveRange;
+    if (timeRange.type === 'today') {
+      const prevStart = new Date(today.getTime() - 86400000);
+      prevStart.setHours(0, 0, 0, 0);
+      const prevEnd = new Date(today.getTime() - 1);
+      return { start: prevStart, end: prevEnd };
+    }
+    if (timeRange.type === 'yesterday') {
+      const prevStart = new Date(today.getTime() - 2 * 86400000);
+      prevStart.setHours(0, 0, 0, 0);
+      const prevEnd = new Date(today.getTime() - 86400000 - 1);
+      return { start: prevStart, end: prevEnd };
+    }
+
+    const durationMs = end.getTime() - start.getTime() + 1;
+    const prevStart = new Date(start.getTime() - durationMs);
+    const prevEnd = new Date(start.getTime() - 1);
+    return { start: prevStart, end: prevEnd };
+  }, [effectiveRange, timeRange, today]);
+
+  // Revenue counts orders in these statuses (adjustable)
+  const REVENUE_STATUSES = ['COMPLETED', 'DELIVERED', 'PAID'];
   const revenueOrders = useMemo(() =>
-    orders.filter(o => o.status === 'COMPLETED'),
-    [orders]);
+    filteredOrders.filter(o => REVENUE_STATUSES.includes((o.status || '').toUpperCase())),
+    [filteredOrders]);
 
-  const todayRevenue = useMemo(() =>
-    revenueOrders.filter(o => new Date(o.orderDate || o.createdAt) >= today)
-              .reduce((s, o) => s + Number(o.finalPrice || o.totalPrice || 0), 0),
-    [revenueOrders, today]);
-
-  const yesterdayRevenue = useMemo(() =>
-    revenueOrders.filter(o => {
+  const selectedPeriodRevenue = useMemo(() => {
+    return revenueOrders.filter(o => {
       const d = new Date(o.orderDate || o.createdAt);
-      return d >= yesterday && d < today;
-    }).reduce((s, o) => s + Number(o.finalPrice || o.totalPrice || 0), 0),
-    [revenueOrders, today, yesterday]);
+      return d >= effectiveRange.start && d <= effectiveRange.end;
+    }).reduce((s, o) => s + Number(o.finalPrice || o.totalPrice || 0), 0);
+  }, [revenueOrders, effectiveRange]);
+
+  const previousPeriodRevenue = useMemo(() => {
+    return revenueOrders.filter(o => {
+      const d = new Date(o.orderDate || o.createdAt);
+      return d >= previousRange.start && d <= previousRange.end;
+    }).reduce((s, o) => s + Number(o.finalPrice || o.totalPrice || 0), 0);
+  }, [revenueOrders, previousRange]);
 
   const threeDaysAgo = useMemo(() => new Date(today.getTime() - 3 * 86400000), [today]);
   const sixDaysAgo = useMemo(() => new Date(today.getTime() - 6 * 86400000), [today]);
@@ -248,12 +282,12 @@ const AdminDashboard = () => {
     [users, sixDaysAgo, threeDaysAgo]);
 
   const todayOrders = useMemo(() =>
-    orders.filter(o => new Date(o.orderDate || o.createdAt) >= today), [orders, today]);
+    filteredOrders.filter(o => new Date(o.orderDate || o.createdAt) >= today), [filteredOrders, today]);
   const yesterdayOrders = useMemo(() =>
-    orders.filter(o => {
+    filteredOrders.filter(o => {
       const d = new Date(o.orderDate || o.createdAt);
       return d >= yesterday && d < today;
-    }), [orders, today, yesterday]);
+    }), [filteredOrders, today, yesterday]);
 
   /* Revenue chart data */
   const revenueChartData = useMemo(() => {
@@ -305,14 +339,14 @@ const AdminDashboard = () => {
   /* Order status donut */
   const orderStatusGroups = useMemo(() => {
     const map = {};
-    orders.forEach(o => {
+    filteredOrders.forEach(o => {
       const key = STATUS_MAP[o.status]?.label || o.status;
       const color = STATUS_MAP[o.status]?.color || '#94a3b8';
       if (!map[key]) map[key] = { label: key, value: 0, color };
       map[key].value++;
     });
     return Object.values(map).sort((a, b) => b.value - a.value);
-  }, [orders]);
+  }, [filteredOrders]);
 
   /* Top selling products */
   const topProducts = useMemo(() =>
@@ -324,17 +358,17 @@ const AdminDashboard = () => {
 
   /* Recent orders */
   const recentOrders = useMemo(() =>
-    [...orders]
+    [...filteredOrders]
       .sort((a, b) => new Date(b.orderDate || b.createdAt) - new Date(a.orderDate || a.createdAt))
       .slice(0, 5),
-    [orders]);
+    [filteredOrders]);
 
   /* New customers — registered in last 3 days */
   const newCustomers = useMemo(() => {
     return [...users]
       .filter(u => u.createdAt && new Date(u.createdAt) >= threeDaysAgo)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [users, today]);
+  }, [users, threeDaysAgo]);
 
   const pct = (now, prev) => {
     if (!prev) return now > 0 ? 100 : 0;
@@ -367,9 +401,17 @@ const AdminDashboard = () => {
   return (
     <div className="space-y-6 pb-6">
       {/* Page header */}
-      <div className="mb-2">
-        <h1 className="text-xl font-black text-slate-900">Tổng quan</h1>
-        <p className="text-xs text-slate-400 mt-0.5">Trang chủ / Tổng quan</p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+        <div>
+          <h1 className="text-xl font-black text-slate-900">Tổng quan</h1>
+          <p className="text-xs text-slate-400 mt-0.5">Trang chủ / Tổng quan</p>
+        </div>
+        {user?.role === 'STORE_ADMIN' && user?.storeName && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-100 rounded-xl text-blue-700 font-bold text-sm shadow-sm">
+            <Building2 size={16} className="text-blue-500" />
+            Cửa hàng: {user.storeName}
+          </div>
+        )}
       </div>
 
       {/* ── Stat Cards ── */}
@@ -384,9 +426,22 @@ const AdminDashboard = () => {
           <StatCard
             icon={<DollarSign size={22} className="text-blue-600" />}
             iconBg="bg-blue-50"
-            label="Doanh thu hôm nay"
-            value={todayRevenue}
-            compare={yesterdayRevenue}
+            label={
+              timeRange.type === 'today'
+                ? "Doanh thu hôm nay"
+                : timeRange.type === 'yesterday'
+                ? "Doanh thu hôm qua"
+                : `Doanh thu (${effectiveRange.label})`
+            }
+            value={selectedPeriodRevenue}
+            compare={previousPeriodRevenue}
+            subLabel={
+              timeRange.type === 'today'
+                ? `So với hôm qua: ${fmt.format(previousPeriodRevenue)}`
+                : timeRange.type === 'yesterday'
+                ? `So với hôm trước: ${fmt.format(previousPeriodRevenue)}`
+                : `So với chu kỳ trước: ${fmt.format(previousPeriodRevenue)}`
+            }
           />
           <StatCard
             icon={<ShoppingBag size={22} className="text-emerald-600" />}
@@ -420,7 +475,14 @@ const AdminDashboard = () => {
         {/* Revenue chart */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-slate-800">Doanh thu</h2>
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">Doanh thu</h2>
+              {!loading && (
+                <p className="text-xl font-black text-blue-600 mt-1 animate-in fade-in duration-300">
+                  {fmt.format(selectedPeriodRevenue)}
+                </p>
+              )}
+            </div>
             <div className="relative">
               <button
                 onClick={() => setShowDropdown(v => !v)}
@@ -537,7 +599,7 @@ const AdminDashboard = () => {
           ) : (
             <div className="flex items-center gap-4">
               <div className="flex-shrink-0 w-40">
-                <DonutChart segments={orderStatusGroups} total={orders.length} />
+                <DonutChart segments={orderStatusGroups} total={filteredOrders.length} />
               </div>
               <div className="space-y-1.5 flex-1 min-w-0">
                 {orderStatusGroups.map((seg, i) => (
@@ -548,7 +610,7 @@ const AdminDashboard = () => {
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <span className="text-[11px] font-bold text-slate-800">{seg.value}</span>
-                      <span className="text-[10px] text-slate-400">({Math.round((seg.value / orders.length) * 100)}%)</span>
+                      <span className="text-[10px] text-slate-400">({filteredOrders.length > 0 ? Math.round((seg.value / filteredOrders.length) * 100) : 0}%)</span>
                     </div>
                   </div>
                 ))}

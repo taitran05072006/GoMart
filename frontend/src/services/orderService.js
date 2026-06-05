@@ -7,6 +7,12 @@ const orderService = {
   getAllOrders: async () => {
     return axiosClient.get('/orders');
   },
+  getOrdersByUserId: async (userId) => {
+    return axiosClient.get(`/orders/user/${userId}`);
+  },
+  previewOrder: async (orderRequest) => {
+    return axiosClient.post('/orders/preview', orderRequest);
+  },
   getOrderById: async (id) => {
     return axiosClient.get(`/orders/${id}`);
   },

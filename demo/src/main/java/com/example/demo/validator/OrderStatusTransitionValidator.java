@@ -2,7 +2,6 @@ package com.example.demo.validator;
 
 import com.example.demo.entity.*;
 import com.example.demo.exception.InvalidOrderStatusTransitionException;
-import org.aspectj.weaver.ast.Or;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -93,7 +92,7 @@ public class OrderStatusTransitionValidator {
             case RETURNED_TO_WAREHOUSE -> {
                 if (order.getStatus() != OrderStatus.RETURN_AWAITING_ADMIN_CONFIRM) {
                     throw new InvalidOrderStatusTransitionException(
-                            "Hàng chỉ có thể về kho khi admin xác nhận từ trạng thái chờ duyệt"
+                            "Hàng chỉ có thể về kho khi quản trị xác nhận từ trạng thái chờ duyệt"
                     );
                 }
             }
@@ -101,7 +100,7 @@ public class OrderStatusTransitionValidator {
             case RETURN_AWAITING_ADMIN_CONFIRM -> {
                 if (order.getStatus() != OrderStatus.RETURN_PICKING && order.getStatus() != OrderStatus.SHIPPING) {
                     throw new InvalidOrderStatusTransitionException(
-                            "Chỉ có thể chờ admin duyệt khi shipper đang hoàn hàng hoặc giao thất bại"
+                            "Chỉ có thể chờ quản trị duyệt khi shipper đang hoàn hàng hoặc giao thất bại"
                     );
                 }
             }

@@ -28,5 +28,10 @@ public class ProductResponseDto {
     private Integer newBatchQuantity;
     private LocalDate manufactureDate;
     private LocalDate expiryDate;
+    private Long importUnitTypeId;
+    private String importUnitName;
+    private Double importConversionRate;
     private List<ProductUnitDto> units;
+    private List<ImportUnitDto> importUnits;
+    private Boolean isSelling;
 }

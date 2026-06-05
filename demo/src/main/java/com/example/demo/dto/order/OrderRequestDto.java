@@ -10,6 +10,7 @@ import java.util.List;
 @Builder
 public class OrderRequestDto {
     private Long userId;
+    private Long storeId;
     private List<OrderItemRequestDto> items;
     private String shippingAddress;// địa chỉ giao hàng
     private String recipientName;// tên người nhận hàng
@@ -20,6 +21,8 @@ public class OrderRequestDto {
     private String district;
     private String ward;
     private String houseNumber;
+    private Double latitude;
+    private Double longitude;
     private Integer useStars;
     private Double totalPrice;
 }

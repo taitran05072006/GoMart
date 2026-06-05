@@ -5,6 +5,7 @@ import SockJSImport from 'sockjs-client/dist/sockjs';
 const SockJS = SockJSImport.default || SockJSImport;
 import toast from 'react-hot-toast';
 import axiosClient from '../api/axiosClient';
+import { useNavigate } from 'react-router-dom';
 
 export const NotificationContext = createContext();
 
@@ -24,11 +25,11 @@ const toastStyles = `
   }
 `;
 
-const ShopeeToast = ({ t, notif, onDismiss }) => (
+const ShopeeToast = ({ t, notif, onDismiss, onClickNotif }) => (
   <>
     <style>{toastStyles}</style>
     <div
-      onClick={onDismiss}
+      onClick={onClickNotif}
       style={{
         animation: t.visible
           ? 'slideInRight 0.35s cubic-bezier(0.21,1.02,0.73,1) forwards'
@@ -72,6 +73,7 @@ const ShopeeToast = ({ t, notif, onDismiss }) => (
 
 export const NotificationProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
+    const navigate = useNavigate();
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const stompClientRef = useRef(null);
@@ -174,7 +176,18 @@ export const NotificationProvider = ({ children }) => {
                             const newNotif = JSON.parse(messageOutput.body);
 
                             toast.custom((t) => (
-                              <ShopeeToast t={t} notif={newNotif} onDismiss={() => { toast.dismiss(t.id); markAsRead(newNotif.id); }} />
+                              <ShopeeToast 
+                                t={t} 
+                                notif={newNotif} 
+                                onDismiss={() => { toast.dismiss(t.id); markAsRead(newNotif.id); }} 
+                                onClickNotif={() => {
+                                  toast.dismiss(t.id);
+                                  markAsRead(newNotif.id);
+                                  if (newNotif.navigateTo) {
+                                    navigate(newNotif.navigateTo);
+                                  }
+                                }}
+                              />
                             ), { duration: 4000, position: 'top-right' });
 
                             setNotifications(prev => [newNotif, ...prev]);

@@ -15,6 +15,9 @@ public class StockReceiptResponseDto {
     private Double totalPrice;
     private Integer totalQuantity;
     private String note;
+    private String status;
+    private Long storeId;
+    private String storeName;
     private List<StockReceiptItemResponseDto> items;
 }
 

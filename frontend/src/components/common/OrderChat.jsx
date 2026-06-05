@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 const OrderChat = ({ order, currentUser, role, initialChannel, forcedChannel }) => {
   const orderId = order?.id;
   const isCustomer = role === 'CUSTORMER';
-  const isAdmin = role === 'ADMIN';
+  const isAdmin = role === 'SUPER_ADMIN' || role === 'STORE_ADMIN';
   const isShipper = role === 'SHIPPER';
 
   // Determine initial channel
@@ -50,8 +50,8 @@ const OrderChat = ({ order, currentUser, role, initialChannel, forcedChannel }) 
     if (!hasShipper) return false;
 
     const status = order.status;
-    return status === 'SHIPPING' || 
-           status === 'DELIVERED' || 
+    return status === 'SHIPPING' ||
+           status === 'DELIVERED' ||
            status === 'COMPLETED' ||
            status === 'RETURN_REQUESTED' ||
            status === 'RETURN_PICKING' ||
@@ -118,7 +118,7 @@ const OrderChat = ({ order, currentUser, role, initialChannel, forcedChannel }) 
             return;
           }
           console.log(`STOMP Chat connected to ${activeChannel}`);
-          
+
           subscriptionRef.current = client.subscribe(
             `/topic/orders/${orderId}/chat/${activeChannel}`,
             (messageOutput) => {
@@ -184,13 +184,13 @@ const OrderChat = ({ order, currentUser, role, initialChannel, forcedChannel }) 
   };
 
   const getRoleLabel = (roleStr) => {
-    if (roleStr === 'ADMIN') return 'Admin';
+    if (roleStr === 'SUPER_ADMIN' || roleStr === 'STORE_ADMIN') return 'Hỗ trợ';
     if (roleStr === 'SHIPPER') return 'Shipper';
     return 'Khách';
   };
 
   const getRoleBadgeColor = (roleStr) => {
-    if (roleStr === 'ADMIN') return 'bg-indigo-100 text-indigo-700';
+    if (roleStr === 'SUPER_ADMIN' || roleStr === 'STORE_ADMIN') return 'bg-indigo-100 text-indigo-700';
     if (roleStr === 'SHIPPER') return 'bg-emerald-100 text-emerald-700';
     return 'bg-blue-100 text-blue-700';
   };

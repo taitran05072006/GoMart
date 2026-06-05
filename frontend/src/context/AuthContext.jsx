@@ -6,21 +6,26 @@ export const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [impersonatedStoreId, setImpersonatedStoreId] = useState('');
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('impersonatedStoreId');
     setUser(null);
+    setImpersonatedStoreId('');
   };
 
   // Initialize from local storage on mount
   useEffect(() => {
     const storedUserString = localStorage.getItem('user');
+    const storedImpersonatedStoreId = localStorage.getItem('impersonatedStoreId') || '';
     console.log('AuthContext: Initializing...', { user: storedUserString });
     try {
       if (storedUserString) {
         const parsedUser = JSON.parse(storedUserString);
         setUser(parsedUser);
+        setImpersonatedStoreId(storedImpersonatedStoreId);
         console.log('AuthContext: User loaded', parsedUser.id);
       } else {
         console.log('AuthContext: No user in storage');
@@ -100,7 +105,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, setUser, refreshUser }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, register, loading, refreshUser, impersonatedStoreId, setImpersonatedStoreId: (id) => {
+      setImpersonatedStoreId(id);
+      if (id) localStorage.setItem('impersonatedStoreId', id);
+      else localStorage.removeItem('impersonatedStoreId');
+    } }}>
       {children}
     </AuthContext.Provider>
   );

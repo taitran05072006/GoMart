@@ -7,6 +7,7 @@ import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.exception.InvalidOrderStatusTransitionException;
 import com.example.demo.repository.*;
 import com.example.demo.validator.OrderStatusTransitionValidator;
+import com.example.demo.repository.StoreRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,8 @@ public class OrderService {
     private final VoucherService voucherService;
     private final CartRepository cartRepository;
     private final ProductUnitRepository productUnitRepository;
+    private final InventoryRepository inventoryRepository;
+    private final StoreRepository storeRepository;
     @Value("${order.auto-complete-delay-minutes:1440}")
     private long autoCompleteDelayMinutes;
 
@@ -84,6 +87,7 @@ public class OrderService {
                         .collect(Collectors.toList()) : null)
                 .actualDeliveryTime(order.getActualDeliveryTime())
                 .rating(order.getRating())
+                .storeId(order.getStore() != null ? order.getStore().getId() : null)
                 .build();
     }
 
@@ -97,7 +101,7 @@ public class OrderService {
         }
     }
 
-    private List<OrderItem> buildOrderItems(List<OrderItemRequestDto> itemDtos, Order order) {
+    private List<OrderItem> buildOrderItems(List<OrderItemRequestDto> itemDtos, Order order, Long storeId) {
         return itemDtos.stream().map(itemDto -> {
 
             if (itemDto.getProductId() == null) {
@@ -115,17 +119,7 @@ public class OrderService {
                 throw new BadRequestException("Sản phẩm " + product.getName() + " chưa có giá");
             }
 
-            if (product.getStock() == null) {
-                throw new BadRequestException("Sản phẩm " + product.getName() + " chưa có tồn kho");
-            }
-
-            // ✅ CHECK STOCK
-            if (product.getStock() < itemDto.getQuantity()) {
-                throw new BadRequestException("Sản phẩm " + product.getName() + " không đủ tồn kho");
-            }
-
-            // Legacy rows may contain NULL optimistic-lock version; normalize before
-            // update.
+            // Legacy rows may contain NULL optimistic-lock version; normalize before update.
             if (product.getVersion() == null) {
                 product.setVersion(0L);
             }
@@ -134,23 +128,43 @@ public class OrderService {
             double conversionRate = itemDto.getConversionRate() != null ? itemDto.getConversionRate() : 1.0;
             int quantityToDeduct = (int) (itemDto.getQuantity() * conversionRate);
 
-            if (product.getStock() < quantityToDeduct) {
-                throw new BadRequestException("Sản phẩm " + product.getName() + " không đủ tồn kho quy đổi");
-            }
+            if (storeId != null) {
+                Inventory inv = inventoryRepository.findByStoreIdAndProductId(storeId, product.getId());
+                int availableStoreStock = inv != null && inv.getQuantity() != null ? inv.getQuantity() : 0;
+                if (availableStoreStock < quantityToDeduct) {
+                    throw new BadRequestException("Sản phẩm " + product.getName() + " không đủ tồn kho tại cửa hàng này (cần " + quantityToDeduct + ", còn " + availableStoreStock + ")");
+                }
 
-            int oldBatch = product.getOldBatchQuantity() != null ? product.getOldBatchQuantity() : 0;
-            int newBatch = product.getNewBatchQuantity() != null ? product.getNewBatchQuantity() : 0;
+                if (inv != null && inv.getQuantity() != null) {
+                    inv.setQuantity(Math.max(0, inv.getQuantity() - quantityToDeduct));
 
-            if (oldBatch >= quantityToDeduct) {
-                product.setOldBatchQuantity(oldBatch - quantityToDeduct);
+                    int oldBatch = inv.getOldBatchQuantity() != null ? inv.getOldBatchQuantity() : 0;
+                    int newBatch = inv.getNewBatchQuantity() != null ? inv.getNewBatchQuantity() : 0;
+
+                    if (oldBatch >= quantityToDeduct) {
+                        inv.setOldBatchQuantity(oldBatch - quantityToDeduct);
+                    } else {
+                        int remaining = quantityToDeduct - oldBatch;
+                        inv.setOldBatchQuantity(0);
+                        inv.setNewBatchQuantity(Math.max(0, newBatch - remaining));
+                    }
+                    inventoryRepository.save(inv);
+                }
+
+                // Đồng bộ tồn kho tổng để các màn tổng quan không bị lệch.
+                int currentGlobalStock = product.getStock() != null ? product.getStock() : 0;
+                product.setStock(Math.max(0, currentGlobalStock - quantityToDeduct));
+                productRepository.save(product);
             } else {
-                int remaining = quantityToDeduct - oldBatch;
-                product.setOldBatchQuantity(0);
-                product.setNewBatchQuantity(Math.max(0, newBatch - remaining));
-            }
+                if (product.getStock() == null || product.getStock() < quantityToDeduct) {
+                    throw new BadRequestException("Sản phẩm " + product.getName() + " không đủ tồn kho");
+                }
 
-            product.setStock(product.getStock() - quantityToDeduct);
-            productRepository.save(product);
+                // Also decrement global product stock to keep consistency
+                if (product.getStock() == null) product.setStock(0);
+                product.setStock(Math.max(0, product.getStock() - quantityToDeduct));
+                productRepository.save(product);
+            }
 
             // Calculate base price for unit from DB (treated as Old Price)
             double enteredPrice;
@@ -274,14 +288,27 @@ public class OrderService {
                 .starsUsed(dto.getUseStars() != null ? dto.getUseStars() : 0)
                 .build();
 
+        // Associate order with a store if provided
+        if (dto.getStoreId() != null) {
+            Store s = storeRepository.findById(dto.getStoreId()).orElse(null);
+            if (s != null) order.setStore(s);
+        }
+
         if (order.getStarsUsed() != null && order.getStarsUsed() < 0) {
             throw new BadRequestException("Số sao sử dụng không hợp lệ");
         }
 
-        List<OrderItem> items = buildOrderItems(dto.getItems(), order);
+        List<OrderItem> items = buildOrderItems(dto.getItems(), order, dto.getStoreId());
         double subtotal = calculateSubtotal(items);
         String shippingAddress = resolveShippingAddress(dto, user);
-        double shippingFee = shippingService.calculateShippingFee(shippingAddress, subtotal);
+        double shippingFee;
+        // Prefer server-side distance calculation when coordinates provided
+        if (dto.getLatitude() != null && dto.getLongitude() != null) {
+            Double fee = shippingService.calculateShippingFeeByCoordinates(dto.getLatitude(), dto.getLongitude(), subtotal, dto.getStoreId());
+            shippingFee = fee != null ? fee : 0.0;
+        } else {
+            shippingFee = shippingService.calculateShippingFee(shippingAddress, subtotal);
+        }
 
         // Apply product voucher
         double voucherDiscount = applyVoucher(dto.getUserId(), effectiveVoucherCode, subtotal);
@@ -372,9 +399,15 @@ public class OrderService {
     }
 
     public List<OrderResponseDto> getAllOrders() {
-        return orderRepository.findAll().stream()
-                .map(this::mapToDto)
-                .collect(Collectors.toList());
+        return orderRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt")).stream()
+            .map(this::mapToDto)
+            .collect(Collectors.toList());
+    }
+
+    public List<OrderResponseDto> getOrdersByStoreId(Long storeId) {
+        return orderRepository.findByStoreIdOrderByCreatedAtDesc(storeId).stream()
+            .map(this::mapToDto)
+            .collect(Collectors.toList());
     }
 
     public List<OrderResponseDto> getAssignedOrdersForShipper(Long shipperId) {
@@ -406,6 +439,131 @@ public class OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại"));
         return mapToDto(order);
+    }
+
+    public List<OrderResponseDto> getOrdersByUserId(Long userId) {
+        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Calculate order totals without persisting or mutating database state.
+     * Used for frontend preview so displayed amounts match server-side logic.
+     */
+    public OrderResponseDto previewOrder(OrderRequestDto dto, String voucherCodeFromParam) {
+        validateRequest(dto);
+
+        User user = userRepository.findById(dto.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("Người dùng không tồn tại"));
+
+        String effectiveVoucherCode = (voucherCodeFromParam != null && !voucherCodeFromParam.isBlank())
+                ? voucherCodeFromParam
+                : dto.getVoucherCode();
+
+        // Build items (read-only calculation)
+        double subtotal = 0.0;
+        List<OrderItem> calcItems = dto.getItems().stream().map(itemDto -> {
+            Product product = productRepository.findById(itemDto.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không tồn tại"));
+
+            double conversionRate = itemDto.getConversionRate() != null ? itemDto.getConversionRate() : 1.0;
+            // Determine unit price (do not modify DB)
+            ProductUnit matchedUnit = productUnitRepository.findByProductId(product.getId())
+                    .stream()
+                    .filter(u -> u.getName() != null && u.getName().equalsIgnoreCase(itemDto.getUnit()))
+                    .findFirst()
+                    .orElse(null);
+
+            double enteredPrice;
+            if (matchedUnit != null && matchedUnit.getPrice() != null) {
+                enteredPrice = matchedUnit.getPrice().doubleValue();
+            } else {
+                enteredPrice = product.getPrice() != null ? product.getPrice().doubleValue() * conversionRate : 0.0;
+            }
+
+            double discountPercent = product.getDiscount() != null ? product.getDiscount() : 0.0;
+            double finalUnitPrice = enteredPrice * (1 - discountPercent / 100.0);
+
+            OrderItem oi = OrderItem.builder()
+                    .product(product)
+                    .quantity(itemDto.getQuantity())
+                    .unit(itemDto.getUnit())
+                    .conversionRate(conversionRate)
+                    .price(finalUnitPrice * itemDto.getQuantity())
+                    .build();
+
+            return oi;
+        }).collect(Collectors.toList());
+
+        subtotal = calcItems.stream().mapToDouble(OrderItem::getPrice).sum();
+
+        // Shipping fee calculation (server-side authoritative)
+        double shippingFee;
+        if (dto.getLatitude() != null && dto.getLongitude() != null) {
+            Double fee = shippingService.calculateShippingFeeByCoordinates(dto.getLatitude(), dto.getLongitude(), subtotal, dto.getStoreId());
+            shippingFee = fee != null ? fee : 0.0;
+        } else {
+            String shippingAddress = dto.getShippingAddress();
+            if (shippingAddress == null || shippingAddress.isBlank()) {
+                shippingAddress = resolveShippingAddress(dto, user);
+            }
+            shippingFee = shippingService.calculateShippingFee(shippingAddress, subtotal);
+        }
+
+        // Voucher discounts (read-only validation and calc)
+        double voucherDiscount = 0.0;
+        if (effectiveVoucherCode != null && !effectiveVoucherCode.isBlank()) {
+            voucherService.validateVoucher(dto.getUserId(), effectiveVoucherCode, subtotal);
+            voucherDiscount = voucherService.calculateDiscount(dto.getUserId(), effectiveVoucherCode, subtotal);
+        }
+
+        double shippingDiscount = 0.0;
+        if (dto.getShippingVoucherCode() != null && !dto.getShippingVoucherCode().isBlank()) {
+            voucherService.validateVoucher(dto.getUserId(), dto.getShippingVoucherCode(), shippingFee);
+            shippingDiscount = voucherService.calculateDiscount(dto.getUserId(), dto.getShippingVoucherCode(), shippingFee);
+        }
+
+        // Stars calculation (do not mutate user's stars)
+        int starsToUse = dto.getUseStars() != null ? dto.getUseStars() : 0;
+        double starDiscount = starsToUse * 1000.0;
+
+        double payableBeforeShippingVoucher = Math.max(0.0, (subtotal + shippingFee) - (voucherDiscount + shippingDiscount));
+        int maxStarsByAmount = (int) Math.floor(payableBeforeShippingVoucher / 1000.0);
+        if (starsToUse > maxStarsByAmount) {
+            starsToUse = maxStarsByAmount;
+            starDiscount = starsToUse * 1000.0;
+        }
+        int userStars = user.getRewardStars() != null ? user.getRewardStars() : 0;
+        if (starsToUse > userStars) {
+            starsToUse = userStars;
+            starDiscount = starsToUse * 1000.0;
+        }
+
+        double totalDiscount = voucherDiscount + starDiscount;
+
+        double finalPrice = (subtotal + shippingFee) - (totalDiscount + shippingDiscount);
+        if (finalPrice < 0) finalPrice = 0.0;
+
+        return OrderResponseDto.builder()
+                .subtotal(subtotal)
+                .shippingFee(shippingFee)
+                .discount(totalDiscount)
+                .shippingDiscount(shippingDiscount)
+                .finalPrice(finalPrice)
+                .totalPrice(finalPrice)
+                .items(calcItems.stream().map(i -> {
+                    return com.example.demo.dto.order.OrderItemResponseDto.builder()
+                            .Productid(i.getProduct() != null ? i.getProduct().getId() : null)
+                            .productName(i.getProduct() != null ? i.getProduct().getName() : "Sản phẩm đã bị xóa")
+                            .quantity(i.getQuantity())
+                            .price(i.getPrice())
+                            .unit(i.getUnit())
+                            .conversionRate(i.getConversionRate())
+                            .build();
+                }).collect(Collectors.toList()))
+                .starsUsed(starsToUse)
+                .build();
     }
 
     public void deleteOrder(Long id) {
@@ -660,11 +818,11 @@ public class OrderService {
                 break;
 
             case RETURN_AWAITING_ADMIN_CONFIRM:
-                log.info("Shipper đã báo trả hàng cho đơn {}. Chờ admin xác nhận hàng về kho", order.getOrderCode());
+                log.info("Shipper đã báo trả hàng cho đơn {}. Chờ quản trị xác nhận hàng về kho", order.getOrderCode());
                 break;
 
             case RETURNED_TO_WAREHOUSE:
-                log.info("Shipper đã giao đơn hàng {} về kho, chờ Admin xác nhận", order.getOrderCode());
+                log.info("Shipper đã giao đơn hàng {} về kho, chờ quản trị xác nhận", order.getOrderCode());
                 break;
 
             case RETURNED:
@@ -763,8 +921,7 @@ public class OrderService {
 
     private void handleRefundInStars(Order order) {
         Payment payment = order.getPayment();
-        if (payment != null &&
-                (payment.getMethod() == PaymentMethod.BANK_TRANSFER || payment.getMethod() == PaymentMethod.PAYOS)) {
+        if (payment != null) {
 
             User user = order.getUser();
             if (user != null) {
@@ -830,7 +987,7 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại"));
 
-        boolean isAdmin = order.getUser().getRole() == Role.ADMIN;
+        boolean isAdmin = order.getUser().getRole() == Role.SUPER_ADMIN || order.getUser().getRole() == Role.STORE_ADMIN;
         try {
             statusValidator.validateCancel(order, isAdmin, false);
         } catch (InvalidOrderStatusTransitionException e) {
@@ -847,7 +1004,6 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại"));
 
         try {
-            boolean isAdmin = order.getUser().getRole() == Role.ADMIN;
             statusValidator.validateReturnRequest(order);
         } catch (InvalidOrderStatusTransitionException e) {
             throw new BadRequestException(e.getMessage());

@@ -10,7 +10,7 @@ const NavbarNotifications = () => {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'STORE_ADMIN';
   const [activeTab, setActiveTab] = useState('all');
 
   const filtered = notifications.filter(n => {
@@ -36,7 +36,7 @@ const NavbarNotifications = () => {
           <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl z-50 border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="p-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
               <span className="font-bold text-slate-900">Thông báo</span>
-              <button 
+              <button
                 onClick={() => setOpen(false)}
                 className="text-xs font-semibold text-slate-400 hover:text-slate-600"
               >
@@ -70,8 +70,8 @@ const NavbarNotifications = () => {
                       if (n.navigateTo) navigate(n.navigateTo);
                     }}
                     className={`px-4 py-3 cursor-pointer transition-colors ${
-                      !n.isRead 
-                        ? 'bg-blue-50/40' 
+                      !n.isRead
+                        ? 'bg-blue-50/40'
                         : 'hover:bg-slate-50'
                     }`}
                     style={{ boxShadow: !n.isRead ? 'inset 3px 0 0 #3b82f6' : 'inset 3px 0 0 transparent' }}
@@ -101,8 +101,8 @@ const TabButton = ({ active, onClick, label }) => (
   <button
     onClick={onClick}
     className={`px-4 py-2 text-xs font-bold transition-all border-b-2 -mb-px ${
-      active 
-        ? 'text-slate-900 border-slate-950' 
+      active
+        ? 'text-slate-900 border-slate-950'
         : 'text-slate-400 border-transparent hover:text-slate-600'
     }`}
   >

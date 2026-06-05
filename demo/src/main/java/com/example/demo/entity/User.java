@@ -1,7 +1,6 @@
 package com.example.demo.entity;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
-import jakarta.annotation.Nullable;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -46,6 +45,10 @@ public class User {
     private LocalDateTime createdAt;
     @Enumerated(EnumType.STRING)
     private Role role;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "store_id")
+    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
+    private Store store;
     private String otp;
     private LocalDateTime otpExpiry;
     @Builder.Default
@@ -66,6 +69,6 @@ public class User {
     @EqualsAndHashCode.Exclude
     private List<Order> orders;
     public boolean isAdmin() {
-        return role == Role.ADMIN;
+        return role == Role.SUPER_ADMIN || role == Role.STORE_ADMIN;
     }
 }

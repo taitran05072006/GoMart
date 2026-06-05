@@ -112,6 +112,10 @@ public class Order {
     @JoinColumn(name = "voucher_id", referencedColumnName = "code")
     private Voucher voucher;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "store_id")
+    private Store store;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) createdAt = LocalDateTime.now();
@@ -128,7 +132,22 @@ public class Order {
     public void calculateFinalPrice() {
         // Tránh lỗi NullPointerException nếu chưa có thông tin shipping
         double shippingFee = (this.shipping != null) ? this.shipping.getShippingFee() : 0.0;
-        this.finalPrice = (this.totalPrice + shippingFee) - this.discount;
+        // Include any shipping-specific discount when computing final price
+        double shippingDiscount = 0.0;
+        if (this.shipping != null) {
+            // OrderShipping may contain a shipping discount value
+            try {
+                shippingDiscount = this.shipping.getShippingDiscount();
+            } catch (Exception ignored) {
+                shippingDiscount = 0.0;
+            }
+        }
+        // Also consider order-level shippingDiscount field as a fallback
+        if (this.shippingDiscount != null) {
+            shippingDiscount = Math.max(shippingDiscount, this.shippingDiscount);
+        }
+
+        this.finalPrice = (this.totalPrice + shippingFee) - (this.discount + shippingDiscount);
         if (this.finalPrice < 0) {
             this.finalPrice = 0.0;
         }

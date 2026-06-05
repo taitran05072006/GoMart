@@ -17,7 +17,7 @@ public enum OrderStatus {
     CANCELLED("Đã hủy"),
     RETURN_REQUESTED("Yêu cầu hoàn trả"),
     RETURN_PICKING("Đang lấy hàng hoàn"),
-    RETURN_AWAITING_ADMIN_CONFIRM("Chờ admin xác nhận hàng về kho"),
+    RETURN_AWAITING_ADMIN_CONFIRM("Chờ quản trị xác nhận hàng về kho"),
     RETURNED_TO_WAREHOUSE("Hàng đã về kho hoàn"),
     RETURNED("Đã hoàn trả");
 

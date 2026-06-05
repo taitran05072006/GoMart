@@ -38,6 +38,12 @@ public class StockReceipt {
     @Column(name = "supplier")
     private String supplierName; // Để lưu tên NCC trực tiếp vào cột 'supplier' trong DB
 
+    private String status = "APPROVED"; // Default cho dữ liệu cũ
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "store_id")
+    private Store store;
+
     @OneToMany(mappedBy = "receipt", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference
     private List<StockReceiptItem> items;

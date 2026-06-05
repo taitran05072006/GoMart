@@ -9,7 +9,8 @@ const Register = () => {
      email: '',
      phone: '',
      password: '',
-     confirmPassword: ''
+     confirmPassword: '',
+     province: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register } = useContext(AuthContext);
@@ -56,7 +57,7 @@ const Register = () => {
       <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 w-full max-w-xl">
         <div className="text-center mb-8">
            <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Tạo Tài khoản</h1>
-           <p className="text-gray-500 mt-2">Tham gia TUBA Mart để bắt đầu mua sắm nhanh hơn</p>
+           <p className="text-gray-500 mt-2">Tham gia GoMart để bắt đầu mua sắm nhanh hơn</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -72,7 +73,6 @@ const Register = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
             <input type="tel" name="phone" placeholder='0xxxxxxxxx' className="input-field" onChange={handleChange} required />
           </div>
-
           <div className="grid grid-cols-2 gap-4">
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>

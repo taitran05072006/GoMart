@@ -13,7 +13,8 @@ const AdminRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (user.role !== 'ADMIN') {
+  // Chỉ cho phép 2 vai trò quản trị hợp lệ
+  if (!(user.role === 'SUPER_ADMIN' || user.role === 'STORE_ADMIN')) {
     return <Navigate to="/" replace />;
   }
 

@@ -23,9 +23,14 @@ public class ProductController {
         return ApiResponse.success( productService.getAll());
     }
 
+    @GetMapping(params = "storeId")
+    public ApiResponse<List<ProductResponseDto>> getProductsByStore(@RequestParam Long storeId) {
+        return ApiResponse.success(productService.getByStoreId(storeId));
+    }
+
     @GetMapping("/{id:[0-9]+}")
-    public ApiResponse<ProductResponseDto> getProductById(@PathVariable Long id) {
-        return ApiResponse.success(productService.getById(id));
+    public ApiResponse<ProductResponseDto> getProductById(@PathVariable Long id, @RequestParam(required = false) Long storeId) {
+        return ApiResponse.success(productService.getById(id, storeId));
     }
 
     @GetMapping("/low-stock")
@@ -39,8 +44,9 @@ public class ProductController {
     }
 
     @PostMapping
-    public ApiResponse<ProductResponseDto> create(@RequestBody ProductRequestDto dto) {
-        return ApiResponse.success("Sản phẩm đã được tạo thành công", productService.create(dto));
+    public ApiResponse<ProductResponseDto> create(@RequestBody ProductRequestDto dto,
+                                                  @RequestParam(required = false) Long storeId) {
+        return ApiResponse.success("Sản phẩm đã được tạo thành công", productService.create(dto, storeId));
     }
 
     @GetMapping("/category/{categoryId}")
@@ -61,7 +67,12 @@ public class ProductController {
     }
 
     @PutMapping("/{id:[0-9]+}")
-    public ApiResponse<ProductResponseDto> update(@PathVariable Long id, @RequestBody ProductRequestDto dto) {
+    public ApiResponse<ProductResponseDto> update(@PathVariable Long id,
+                                                  @RequestBody ProductRequestDto dto,
+                                                  @RequestParam(required = false) Long storeId) {
+        if (storeId != null) {
+            return ApiResponse.success("Sản phẩm cửa hàng đã được cập nhật thành công", productService.updateForStore(id, dto, storeId));
+        }
         return ApiResponse.success("Sản phẩm đã được cập nhật thành công", productService.update(id, dto));
     }
 
@@ -69,6 +80,11 @@ public class ProductController {
     public ApiResponse<String> delete(@PathVariable Long id) {
         productService.delete(id);
         return ApiResponse.success("Sản phẩm đã được xóa thành công", null);
+    }
+
+    @PostMapping("/{id:[0-9]+}/store/{storeId}/toggle-selling")
+    public ApiResponse<ProductResponseDto> toggleSelling(@PathVariable Long id, @PathVariable Long storeId) {
+        return ApiResponse.success("Đã cập nhật trạng thái bán của sản phẩm", productService.toggleSelling(id, storeId));
     }
     @GetMapping("/filter")
     public ApiResponse<List<ProductResponseDto>> filterProducts(

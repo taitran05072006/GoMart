@@ -12,4 +12,6 @@ public class SupplierResponseDto {
     private String address;
     private String email;
     private String supplyType;
+    private Long storeId;
+    private String storeName;
 }

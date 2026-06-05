@@ -20,7 +20,13 @@ const Login = () => {
 
     if (res.success) {
       toast.success("Đăng nhập thành công!");
-      navigate(res.user?.role === 'ADMIN' ? '/admin' : '/');
+      if (res.user?.role === 'SUPER_ADMIN' || res.user?.role === 'STORE_ADMIN') {
+        navigate('/admin');
+      } else if (res.user?.role === 'SHIPPER') {
+        navigate('/shipper/orders');
+      } else {
+        navigate('/');
+      }
     } else {
       toast.error(res.message || "Email hoặc mật khẩu không đúng");
     }
@@ -31,7 +37,7 @@ const Login = () => {
       <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Đăng nhập</h1>
-          <p className="text-gray-500 mt-2">Đăng nhập vào tài khoản MiniMart của bạn</p>
+          <p className="text-gray-500 mt-2">Đăng nhập vào tài khoản GoMart của bạn</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">

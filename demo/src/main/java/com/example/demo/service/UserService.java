@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.auth.*;
+import com.example.demo.dto.user.CreateAdminAccountRequestDto;
 import com.example.demo.dto.user.AdminUserResponseDto;
 import com.example.demo.dto.user.ResetPasswordWithOtpRequestDto;
 import com.example.demo.entity.Role;
@@ -12,9 +13,11 @@ import com.example.demo.exception.BadRequestException;
 import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.exception.UserNotFoundException;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.repository.StoreRepository;
+import com.example.demo.service.RegionDetectionService;
+import com.example.demo.entity.Store;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -31,10 +34,11 @@ public class UserService {
 
     private final UserRepository repo;
     private final PasswordEncoder passwordEncoder;
-    private final JdbcTemplate jdbcTemplate;
     private final OtpService otpService;
     private final SmsService smsService;
     private final MailService mailService;
+    private final StoreRepository storeRepository;
+    private final RegionDetectionService regionDetectionService;
 
     @Value("${otp.allow-without-sms:true}")
     private boolean allowOtpWithoutSms;
@@ -42,13 +46,14 @@ public class UserService {
     @Value("${otp.debug-expose:true}")
     private boolean debugExposeOtp;
 
-    public UserService(OtpService optService, SmsService smsService, MailService mailService, UserRepository repo, PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
+    public UserService(OtpService optService, SmsService smsService, MailService mailService, UserRepository repo, PasswordEncoder passwordEncoder, StoreRepository storeRepository, RegionDetectionService regionDetectionService) {
         this.repo = repo;
         this.passwordEncoder = passwordEncoder;
-        this.jdbcTemplate = jdbcTemplate;
         this.smsService = smsService;
         this.otpService = optService;
         this.mailService = mailService;
+        this.storeRepository = storeRepository;
+        this.regionDetectionService = regionDetectionService;
     }
 
 
@@ -63,6 +68,7 @@ public class UserService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .build();
         user.setRole(Role.CUSTORMER);
+
         repo.save(user);
 
         return ApiResponse.success("User được đăng ký thành công!", mapToAuthDto(user));
@@ -73,7 +79,7 @@ public class UserService {
         if(OptionUser.isEmpty()) throw new UserNotFoundException("Email không tồn tại!");
         User user = OptionUser.get();
         if(!passwordEncoder.matches(request.getPassword(), user.getPassword())) throw new InvalidPasswordException("Mật khẩu không đúng!");
-        
+
         return ApiResponse.success("Đăng nhập thành công!", mapToAuthDto(user));
     }
 
@@ -120,14 +126,66 @@ public class UserService {
         if (user.getWard() != null) fullAddress.append(user.getWard()).append(", ");
         if (user.getDistrict() != null) fullAddress.append(user.getDistrict()).append(", ");
         if (user.getProvince() != null) fullAddress.append(user.getProvince());
-        
+
         String addr = fullAddress.toString().trim();
         if (addr.endsWith(",")) addr = addr.substring(0, addr.length() - 1);
         user.setAddress(addr);
 
         repo.save(user);
 
+        if (request.getStoreId() != null) {
+            Store requestedStore = storeRepository.findById(request.getStoreId()).orElse(null);
+            if (requestedStore != null) {
+                user.setStore(requestedStore);
+                repo.save(user);
+            }
+        } else {
+            // After updating address, attempt to associate nearest store for the user.
+            try {
+                String userAddress = user.getAddress();
+                if (userAddress != null && !userAddress.isBlank()) {
+                    var stores = regionDetectionService.storesByAddress(userAddress);
+                    if (stores != null && !stores.isEmpty()) {
+                        // If client provided coordinates, prefer nearest by distance
+                        Double lat = request.getLatitude();
+                        Double lng = request.getLongitude();
+                        com.example.demo.entity.Store best = null;
+                        if (lat != null && lng != null) {
+                            double minD = Double.MAX_VALUE;
+                            for (com.example.demo.entity.Store s : stores) {
+                                if (s.getLatitude() == null || s.getLongitude() == null) continue;
+                                double d = haversineKm(lat, lng, s.getLatitude(), s.getLongitude());
+                                if (d < minD) { minD = d; best = s; }
+                            }
+                        }
+                        if (best == null) {
+                            best = stores.get(0);
+                        }
+                        if (best != null) {
+                            user.setStore(best);
+                            repo.save(user);
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                // Don't fail profile update if store association fails
+                log.warn("Failed to auto-assign store for user {}: {}", user.getId(), ex.getMessage());
+            }
+        }
+
         return ApiResponse.success("Cập nhật profile thành công!", mapToAuthDto(user));
+    }
+
+    // Haversine distance in kilometers
+    private double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371; // Radius of the earth in km
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
     }
     public ApiResponse<String> changePassword(ChangePasswordRequestDto request){
         User user = repo.findById(request.getUserId())
@@ -155,26 +213,118 @@ public class UserService {
     }
 
     public ApiResponse<List<AdminUserResponseDto>> getAllUsersForAdmin() {
-        List<AdminUserResponseDto> users = repo.findAll().stream().map(this::mapToAdminDto).toList();
+        List<AdminUserResponseDto> users = repo.findAll().stream()
+                .filter(u -> u.getRole() == Role.CUSTORMER)
+                .map(this::mapToAdminDto)
+                .toList();
         return ApiResponse.success(users);
     }
 
-    public ApiResponse<AdminUserResponseDto> updateUserRole(Long userId, String roleValue) {
+    public ApiResponse<AdminUserResponseDto> createAdminAccount(CreateAdminAccountRequestDto request, Role requesterRole, Long requesterStoreId, Long impersonatedStoreId) {
+        if (request == null) {
+            throw new BadRequestException("Thiếu dữ liệu tạo tài khoản");
+        }
+
+        String name = request.getName() != null ? request.getName().trim() : "";
+        String email = request.getEmail() != null ? request.getEmail().trim() : "";
+        String phone = request.getPhone() != null ? request.getPhone().trim() : "";
+        String password = request.getPassword() != null ? request.getPassword() : "";
+
+        if (name.isBlank() || email.isBlank() || phone.isBlank() || password.isBlank()) {
+            throw new BadRequestException("Vui lòng điền đầy đủ thông tin tài khoản");
+        }
+
+        if (repo.existsByEmail(email)) {
+            throw new EmailAlreadyExistException("Email đã tồn tại!");
+        }
+
+        if (phone.isBlank()) {
+            throw new BadRequestException("Vui lòng nhập số điện thoại");
+        }
+
+        Role targetRole;
+        try {
+            targetRole = Role.valueOf(request.getRole().trim().toUpperCase());
+        } catch (Exception ex) {
+            throw new BadRequestException("Vai trò không hợp lệ");
+        }
+
+        boolean requesterIsSuperAdmin = requesterRole == Role.SUPER_ADMIN;
+        boolean requesterIsStoreAdmin = requesterRole == Role.STORE_ADMIN;
+        boolean storeScopedMode = impersonatedStoreId != null;
+
+        if (requesterIsSuperAdmin) {
+            if (storeScopedMode) {
+                if (targetRole != Role.SHIPPER) {
+                    throw new BadRequestException("Trong chế độ cửa hàng, SUPER_ADMIN chỉ được tạo SHIPPER");
+                }
+            } else if (targetRole != Role.STORE_ADMIN && targetRole != Role.SUPER_ADMIN) {
+                throw new BadRequestException("SUPER_ADMIN chỉ được tạo tài khoản SUPER_ADMIN hoặc STORE_ADMIN");
+            }
+        } else if (requesterIsStoreAdmin) {
+            if (targetRole != Role.SHIPPER) {
+                throw new BadRequestException("STORE_ADMIN chỉ được tạo tài khoản SHIPPER");
+            }
+        } else {
+            throw new BadRequestException("Không có quyền tạo tài khoản");
+        }
+
+        User user = User.builder()
+                .name(name)
+                .email(email)
+                .phone(phone)
+                .password(passwordEncoder.encode(password))
+                .role(targetRole)
+                .build();
+
+        if (targetRole == Role.STORE_ADMIN) {
+            if (request.getStoreId() == null) {
+                throw new BadRequestException("Vui lòng chọn cửa hàng cho tài khoản STORE_ADMIN");
+            }
+            Store store = storeRepository.findById(request.getStoreId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Cửa hàng không tồn tại"));
+            user.setStore(store);
+        } else if (requesterIsStoreAdmin || storeScopedMode) {
+            Long targetStoreId = storeScopedMode ? impersonatedStoreId : requesterStoreId;
+            if (targetStoreId == null) {
+                throw new BadRequestException("Tài khoản của bạn chưa gắn cửa hàng");
+            }
+            Store store = storeRepository.findById(targetStoreId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Cửa hàng không tồn tại"));
+            user.setStore(store);
+        }
+
+        repo.save(user);
+        return ApiResponse.success("Tạo tài khoản thành công", mapToAdminDto(user));
+    }
+
+    public ApiResponse<AdminUserResponseDto> updateUserRole(Long userId, com.example.demo.dto.user.UpdateUserRoleRequestDto request) {
         User user = repo.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Người dùng không tồn tại"));
 
-        if (roleValue == null || roleValue.isBlank()) {
+        if (request.getRole() == null || request.getRole().isBlank()) {
             throw new IllegalArgumentException("Vai trò mới không được để trống");
         }
 
         Role role;
         try {
-            role = Role.valueOf(roleValue.trim().toUpperCase());
+            role = Role.valueOf(request.getRole().trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Vai trò không hợp lệ. Các giá trị cho phép: ADMIN, CUSTORMER, SHIPPER");
+            throw new IllegalArgumentException("Vai trò không hợp lệ. Các giá trị cho phép: SUPER_ADMIN, STORE_ADMIN, CUSTORMER, SHIPPER");
         }
 
         user.setRole(role);
+
+        if (role == Role.STORE_ADMIN) {
+            if (request.getStoreId() != null) {
+                Store store = storeRepository.findById(request.getStoreId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Cửa hàng không tồn tại"));
+                user.setStore(store);
+            }
+        } else {
+            user.setStore(null);
+        }
+
         repo.save(user);
         return ApiResponse.success("Cập nhật vai trò người dùng thành công", mapToAdminDto(user));
     }
@@ -182,14 +332,14 @@ public class UserService {
     public ApiResponse<String> deleteUserForAdmin(Long userId) {
         User user = repo.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Người dùng không tồn tại"));
-        
+
         // Thay đổi email và số điện thoại để tránh lỗi unique constraint nếu user đăng ký lại
         user.setEmail(user.getEmail() + "_deleted_" + System.currentTimeMillis());
         if (user.getPhone() != null) {
             user.setPhone(user.getPhone() + "_deleted_" + System.currentTimeMillis());
         }
         repo.save(user);
-        
+
         repo.delete(user);
         return ApiResponse.success("Người dùng đã được xóa thành công", null);
     }
@@ -200,6 +350,29 @@ public class UserService {
                 .map(this::mapToAdminDto)
                 .toList();
         return ApiResponse.success(shippers);
+    }
+
+    public ApiResponse<List<AdminUserResponseDto>> getStoreAdminsForAdmin() {
+        List<AdminUserResponseDto> storeAdmins = repo.findByRoleOrderByNameAsc(Role.STORE_ADMIN)
+                .stream()
+                .map(this::mapToAdminDto)
+                .toList();
+        return ApiResponse.success(storeAdmins);
+    }
+
+    public ApiResponse<List<AdminUserResponseDto>> getShippersForRequester(Role requesterRole, Long requesterStoreId) {
+        if (requesterRole == Role.SUPER_ADMIN) {
+            return getAllShippersForAdmin();
+        }
+        if (requesterRole == Role.STORE_ADMIN && requesterStoreId != null) {
+                List<AdminUserResponseDto> shippers = repo.findByRoleAndStoreId(Role.SHIPPER, requesterStoreId)
+                    .stream()
+                    .sorted(java.util.Comparator.comparing(User::getName, java.util.Comparator.nullsLast(String::compareToIgnoreCase)))
+                    .map(this::mapToAdminDto)
+                    .toList();
+            return ApiResponse.success(shippers);
+        }
+        throw new BadRequestException("Không có quyền xem danh sách shipper");
     }
 
     public String sendOtp(String phone) {
@@ -307,10 +480,10 @@ public class UserService {
         verifyResetToken(req.getEmail(), req.getToken());
         User user = repo.findByEmail(req.getEmail().trim())
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy người dùng"));
-        
+
         user.setPassword(passwordEncoder.encode(req.getNewPassword()));
         repo.save(user);
-        
+
         otpService.clear("EMAIL_" + req.getEmail().trim());
     }
 
@@ -371,7 +544,21 @@ public class UserService {
         return debugExposeOtp;
     }
 
+    private Store getSafeStore(User user) {
+        if (user.getStore() == null) {
+            return null;
+        }
+        try {
+            // Trigger initialization of the lazy loading proxy
+            user.getStore().getName();
+            return user.getStore();
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            return null;
+        }
+    }
+
     private AdminUserResponseDto mapToAdminDto(User user) {
+        Store store = getSafeStore(user);
         return AdminUserResponseDto.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -379,6 +566,8 @@ public class UserService {
                 .phone(user.getPhone())
                 .address(user.getAddress())
                 .role(user.getRole() != null ? user.getRole().name() : null)
+                .storeId(store != null ? store.getId() : null)
+                .storeName(store != null ? store.getName() : null)
                 .createdAt(user.getCreatedAt())
                 .build();
     }
@@ -389,6 +578,7 @@ public class UserService {
     }
 
     private AuthResponseDto mapToAuthDto(User user) {
+        Store store = getSafeStore(user);
         return AuthResponseDto.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -403,6 +593,8 @@ public class UserService {
                 .rewardStars(user.getRewardStars())
                 .tier(user.getTier())
                 .role(user.getRole() != null ? user.getRole().name() : null)
+                .storeId(store != null ? store.getId() : null)
+                .storeName(store != null ? store.getName() : null)
                 .build();
     }
 }

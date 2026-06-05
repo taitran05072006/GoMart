@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import orderService from '../services/orderService';
 import authService from '../services/authService';
@@ -16,7 +16,22 @@ import axiosClient from '../api/axiosClient';
 
 const useQuery = () => new URLSearchParams(useLocation().search);
 
+const PROVINCES = [
+  "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu", "Bắc Ninh",
+  "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước", "Bình Thuận", "Cà Mau",
+  "Cần Thơ", "Cao Bằng", "Đà Nẵng", "Đắk Lắk", "Đắk Nông", "Điện Biên", "Đồng Nai",
+  "Đồng Tháp", "Gia Lai", "Hà Giang", "Hà Nam", "Hà Nội", "Hà Tĩnh", "Hải Dương",
+  "Hải Phòng", "Hậu Giang", "Hòa Bình", "Hưng Yên", "Khánh Hòa", "Kiên Giang",
+  "Kon Tum", "Lai Châu", "Lâm Đồng", "Lạng Sơn", "Lào Cai", "Long An", "Nam Định",
+  "Nghệ An", "Ninh Bình", "Ninh Thuận", "Phú Thọ", "Phú Yên", "Quảng Bình",
+  "Quảng Nam", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị", "Sóc Trăng", "Sơn La",
+  "Tây Ninh", "Thái Bình", "Thái Nguyên", "Thanh Hóa", "Thừa Thiên Huế", "Tiền Giang",
+  "TP Hồ Chí Minh", "Trà Vinh", "Tuyên Quang", "Vĩnh Long", "Vĩnh Phúc", "Yên Bái"
+];
+
 const Profile = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const query = useQuery();
   const initialTab = query.get('tab') || 'info';
 
@@ -37,6 +52,24 @@ const Profile = () => {
   const [ratingStars, setRatingStars] = useState(5);
   const [ratingOrder, setRatingOrder] = useState(null);
   const [unreadCountsByOrder, setUnreadCountsByOrder] = useState({});
+
+  // Sync tab and selectedOrder from URL search params
+  useEffect(() => {
+    const tab = query.get('tab');
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [location.search, activeTab]);
+
+  useEffect(() => {
+    const orderId = query.get('orderId');
+    if (orderId && orders.length > 0) {
+      const order = orders.find(o => String(o.id) === String(orderId) || String(o.orderCode) === String(orderId));
+      if (order) {
+        setSelectedOrder(order);
+      }
+    }
+  }, [orders, location.search]);
 
   // List-wide real-time chat notifications tracker
   useEffect(() => {
@@ -161,6 +194,7 @@ const Profile = () => {
   }, [selectedOrder?.id, user?.id, showChatModal, activeChatChannel]);
 
 
+  const [stores, setStores] = useState([]);
   const [profileData, setProfileData] = useState({
      name: user?.name || '',
      phone: user?.phone || '',
@@ -169,6 +203,15 @@ const Profile = () => {
      ward: user?.ward || '',
      houseNumber: user?.houseNumber || ''
   });
+
+  useEffect(() => {
+    axiosClient.get('/stores').then(res => {
+      const data = res?.data?.data || res?.data || res || [];
+      setStores(Array.isArray(data) ? data.filter(s => s.deleted !== true) : []);
+    }).catch(err => {
+      console.error('Không thể tải danh sách cửa hàng', err);
+    });
+  }, []);
 
   useEffect(() => {
     const fetchLatestUser = async () => {
@@ -224,7 +267,7 @@ const Profile = () => {
      if(activeTab === 'orders') {
         fetchOrders();
      }
-  }, [activeTab]);
+  }, [activeTab, location.search]);
 
   const fetchOrders = async () => {
      if(!user) return;
@@ -241,9 +284,9 @@ const Profile = () => {
           console.error('Không thể đồng bộ sao tích lũy mới nhất', e);
         }
 
-        const res = await orderService.getAllOrders();
-        const allOrders = res.data || res || [];
-        const myOrders = allOrders.filter(o => o.userId === user.id || o.user?.id === user.id);
+        // Use user-specific endpoint to fetch only the customer's orders
+        const res = await orderService.getOrdersByUserId(user.id);
+        const myOrders = res.data || res || [];
         setOrders(myOrders);
 
         // Fetch historical unread counts for each order
@@ -285,7 +328,7 @@ const Profile = () => {
 
   const handlePaid = (orderId) => {
     setShowQRModal(false);
-    fetchOrders(); 
+    fetchOrders();
     if (selectedOrder && (selectedOrder.id === orderId || selectedOrder.orderId === orderId)) {
       setSelectedOrder({ ...selectedOrder, status: 'PAID', paymentStatus: 'PAID' });
     }
@@ -405,11 +448,35 @@ const Profile = () => {
      e.preventDefault();
      if(!user) return;
      try {
-       const res = await authService.updateProfile(user.id, profileData);
+       // Attempt to geocode the provided address to get lat/lng for nearest-store detection
+       const fullAddress = [profileData.houseNumber, profileData.ward, profileData.district, profileData.province].filter(Boolean).join(', ');
+       let lat = null; let lon = null;
+       try {
+         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullAddress)}&format=json&limit=1&countrycodes=vn`, { headers: { 'Accept-Language': 'vi' } });
+         const data = await res.json();
+         if (data && data.length > 0) {
+           lat = parseFloat(data[0].lat);
+           lon = parseFloat(data[0].lon);
+         }
+       } catch (err) {
+         // Geocode failure — continue without coords
+         console.warn('Geocode failed', err);
+       }
+
+       const payload = { ...profileData };
+       if (lat != null && lon != null) { payload.latitude = lat; payload.longitude = lon; }
+
+       const res = await authService.updateProfile(user.id, payload);
        if(res && res.data) {
            toast.success("Hồ sơ đã được cập nhật thành công!");
            setUser(res.data);
            localStorage.setItem('user', JSON.stringify(res.data));
+
+           // If user came from checkout, return them to checkout to continue
+           const from = query.get('from');
+           if (from === 'checkout') {
+             navigate('/checkout', { replace: true });
+           }
        }
      } catch(err) {
        toast.error("Cập nhật hồ sơ thất bại: " + (err.message || "Lỗi không xác định"));
@@ -497,7 +564,10 @@ const Profile = () => {
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                    <div>
                      <label className="block text-sm font-medium text-gray-700 mb-1">Tỉnh / Thành phố</label>
-                     <input type="text" className="input-field" value={profileData.province} onChange={(e) => setProfileData({...profileData, province: e.target.value})} placeholder="Ví dụ: Đà Nẵng" required />
+                     <select className="input-field" value={profileData.province} onChange={(e) => setProfileData({...profileData, province: e.target.value})} required>
+                        <option value="">-- Chọn Tỉnh / Thành phố --</option>
+                        {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+                     </select>
                    </div>
                    <div>
                      <label className="block text-sm font-medium text-gray-700 mb-1">Quận / Huyện</label>
@@ -506,15 +576,15 @@ const Profile = () => {
                  </div>
 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">Phường / Xã</label>
-                     <input type="text" className="input-field" value={profileData.ward} onChange={(e) => setProfileData({...profileData, ward: e.target.value})} placeholder="Ví dụ: Hòa Khánh Bắc" required />
-                   </div>
-                   <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">Số nhà, tên đường</label>
-                     <input type="text" className="input-field" value={profileData.houseNumber} onChange={(e) => setProfileData({...profileData, houseNumber: e.target.value})} placeholder="Ví dụ: 123 Ngô Sĩ Liên" required />
-                   </div>
-                 </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phường / Xã</label>
+                      <input type="text" className="input-field" value={profileData.ward} onChange={(e) => setProfileData({...profileData, ward: e.target.value})} placeholder="Ví dụ: Hòa Khánh Bắc" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Số nhà, tên đường</label>
+                      <input type="text" className="input-field" value={profileData.houseNumber} onChange={(e) => setProfileData({...profileData, houseNumber: e.target.value})} placeholder="Ví dụ: 123 Ngô Sĩ Liên" required />
+                    </div>
+                  </div>
 
                  <button type="submit" className="btn-primary px-8">Cập nhật</button>
                </form>
@@ -538,7 +608,12 @@ const Profile = () => {
             {orders.map(order => (
               <div
                 key={order.id}
-                onClick={() => setSelectedOrder(order)}
+                onClick={() => {
+                  setSelectedOrder(order);
+                  const params = new URLSearchParams(window.location.search);
+                  params.set('orderId', order.orderCode || order.id);
+                  navigate({ search: params.toString() }, { replace: true });
+                }}
                 className="border rounded-xl p-4 cursor-pointer hover:shadow flex justify-between items-center transition-all duration-200 hover:border-blue-200 hover:bg-slate-50/20"
               >
                 <div className="flex-1">
@@ -584,17 +659,17 @@ const Profile = () => {
                       const hasShipper = order.assignedShipper != null || order.shipperId != null || order.shipperName != null;
                       const status = order.status;
                       const isShipperUnlocked = hasShipper && (
-                        status === 'SHIPPING' || 
-                        status === 'DELIVERED' || 
+                        status === 'SHIPPING' ||
+                        status === 'DELIVERED' ||
                         status === 'COMPLETED' ||
                         status === 'RETURN_REQUESTED' ||
                         status === 'RETURN_PICKING' ||
                         status === 'RETURNED'
                       );
-                      
+
                       setActiveChatChannel(isShipperUnlocked ? 'CUSTOMER_SHIPPER' : 'CUSTOMER_ADMIN');
                       setShowChatModal(true);
-                      
+
                       setUnreadCountsByOrder(prev => ({
                         ...prev,
                         [order.id]: 0
@@ -607,7 +682,7 @@ const Profile = () => {
                     }`}
                   >
                     <MessageSquare size={18} />
-                    
+
                     {unreadCountsByOrder[order.id] > 0 && (
                       <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border border-white shadow animate-bounce">
                         {unreadCountsByOrder[order.id]}
@@ -628,7 +703,12 @@ const Profile = () => {
     {selectedOrder && (
       <>
         <button
-          onClick={() => setSelectedOrder(null)}
+          onClick={() => {
+            setSelectedOrder(null);
+            const params = new URLSearchParams(window.location.search);
+            params.delete('orderId');
+            navigate({ search: params.toString() }, { replace: true });
+          }}
           className="mb-6 text-blue-500 hover:underline"
         >
           ← Quay lại danh sách
@@ -665,7 +745,7 @@ const Profile = () => {
             <p className="text-sm text-slate-700">Trạng thái: {selectedOrder.paymentStatus || 'N/A'}</p>
             <div className="flex flex-wrap gap-2 mt-2">
               {selectedOrder.paymentMethod === 'BANK_TRANSFER' && selectedOrder.paymentStatus === 'UNPAID' && selectedOrder.status !== 'CANCELLED' && (
-                <button 
+                <button
                   onClick={() => handleRePay(selectedOrder)}
                   className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600 transition-colors shadow-sm"
                 >
@@ -736,7 +816,7 @@ const Profile = () => {
           </h3>
           <div className="flex items-center gap-8 justify-center py-6 px-4 bg-slate-50/50 rounded-3xl border border-slate-100/80">
             {/* Chat với Admin Icon Button */}
-            <button 
+            <button
               onClick={() => {
                 setActiveChatChannel('CUSTOMER_ADMIN');
                 setShowChatModal(true);
@@ -746,7 +826,7 @@ const Profile = () => {
             >
               <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-200/80 group-hover:shadow-blue-300/80 transition-all duration-300 group-hover:scale-110 active:scale-95 relative">
                 <Shield size={26} className="group-hover:rotate-12 transition-transform duration-300" />
-                
+
                 {unreadAdminCount > 0 ? (
                   <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md animate-bounce">
                     {unreadAdminCount}
@@ -769,8 +849,8 @@ const Profile = () => {
               const hasShipper = selectedOrder.assignedShipper != null || selectedOrder.shipperId != null || selectedOrder.shipperName != null;
               const status = selectedOrder.status;
               const isUnlocked = hasShipper && (
-                status === 'SHIPPING' || 
-                status === 'DELIVERED' || 
+                status === 'SHIPPING' ||
+                status === 'DELIVERED' ||
                 status === 'COMPLETED' ||
                 status === 'RETURN_REQUESTED' ||
                 status === 'RETURN_PICKING' ||
@@ -779,7 +859,7 @@ const Profile = () => {
 
               if (isUnlocked) {
                 return (
-                  <button 
+                  <button
                     onClick={() => {
                       setActiveChatChannel('CUSTOMER_SHIPPER');
                       setShowChatModal(true);
@@ -789,7 +869,7 @@ const Profile = () => {
                   >
                     <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-amber-200/80 group-hover:shadow-amber-300/80 transition-all duration-300 group-hover:scale-110 active:scale-95 relative">
                       <Truck size={26} className="group-hover:translate-x-0.5 transition-transform duration-300" />
-                      
+
                       {unreadShipperCount > 0 ? (
                         <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md animate-bounce">
                           {unreadShipperCount}
@@ -816,13 +896,13 @@ const Profile = () => {
 
         {selectedOrder.status === 'DELIVERED' && (
           <div className="mt-6 flex flex-col sm:flex-row items-center justify-end gap-4 border-t border-slate-100 pt-6">
-            <button 
+            <button
               onClick={() => handleNotReceived(selectedOrder)}
               className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-rose-500 text-rose-500 font-bold hover:bg-rose-50 transition-colors shadow-sm text-sm"
             >
               Tôi chưa nhận được hàng
             </button>
-            <button 
+            <button
               onClick={() => {
                 setRatingOrder(selectedOrder);
                 setRatingStars(5);
@@ -837,7 +917,7 @@ const Profile = () => {
 
         {selectedOrder.status === 'COMPLETED' && canReturn(selectedOrder) && (
           <div className="mt-4 flex justify-end">
-            <button 
+            <button
               onClick={() => handleRequestReturn(selectedOrder)}
               className="px-6 py-2 rounded-xl bg-white border border-red-500 text-red-500 font-bold hover:bg-red-50 transition-colors shadow-sm flex items-center gap-2"
             >
@@ -857,9 +937,9 @@ const Profile = () => {
 )}
       </div>
       {showQRModal && paymentSession && (
-        <QRPaymentModal 
-          paymentSession={paymentSession} 
-          onPaid={handlePaid} 
+        <QRPaymentModal
+          paymentSession={paymentSession}
+          onPaid={handlePaid}
           onCancel={() => setShowQRModal(false)}
         />
       )}
@@ -869,14 +949,14 @@ const Profile = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md" onClick={() => setShowChatModal(false)}></div>
           <div className="relative w-full max-w-xl animate-in zoom-in-95 duration-200 flex flex-col gap-4">
-            
+
             {/* Elegant Header Above the Chat Box */}
             <div className="flex items-center justify-between text-slate-800 bg-white/95 backdrop-blur px-6 py-4 rounded-2xl shadow-sm border border-slate-100/50">
               <div className="flex items-center gap-2">
                 <span className="text-xl">💬</span>
                 <span className="font-bold text-slate-800 text-sm md:text-base">Trò chuyện Hỗ trợ & Vận chuyển</span>
               </div>
-              <button 
+              <button
                 onClick={() => setShowChatModal(false)}
                 className="w-8 h-8 rounded-full bg-slate-150 text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-lg font-bold transition-all focus:outline-none"
               >
@@ -886,11 +966,11 @@ const Profile = () => {
 
             {/* Chat Box Container */}
             <div className="h-[500px]">
-              <OrderChat 
-                order={selectedOrder} 
-                currentUser={user} 
-                role="CUSTORMER" 
-                initialChannel={activeChatChannel} 
+              <OrderChat
+                order={selectedOrder}
+                currentUser={user}
+                role="CUSTORMER"
+                initialChannel={activeChatChannel}
               />
             </div>
           </div>

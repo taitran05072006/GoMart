@@ -19,4 +19,6 @@ public class AuthResponseDto {
     private Integer rewardStars;
     private String tier;
     private String role;
+    private Long storeId;
+    private String storeName;
 }

@@ -1,6 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AUTH_REDIRECT_EVENT } from './api/axiosClient';
+import { NotificationProvider } from './context/NotificationContext';
+import { AuthContext } from './context/AuthContext';
+import toast from 'react-hot-toast';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import Home from './pages/Home';
@@ -17,6 +20,7 @@ import ShipperRoute from './components/layout/ShipperRoute';
 import AdminLayout from './components/layout/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminProducts from './pages/admin/AdminProducts';
+import AdminStoreProducts from './pages/admin/AdminStoreProducts';
 import AdminProductForm from './pages/admin/AdminProductForm';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminCategories from './pages/admin/AdminCategories';
@@ -25,20 +29,26 @@ import AdminVouchers from './pages/admin/AdminVouchers';
 import AdminVoucherForm from './pages/admin/AdminVoucherForm';
 import AdminStockReceipts from './pages/admin/AdminStockReceipts';
 import AdminStockReceiptForm from './pages/admin/AdminStockReceiptForm';
+import AdminImportUnits from './pages/admin/AdminImportUnits';
 import AdminCustomers from './pages/admin/AdminCustomers';
+import AdminAccounts from './pages/admin/AdminAccounts';
+import AdminInventory from './pages/admin/AdminInventory';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import ShipperOrders from './pages/ShipperOrders';
 import OrderSuccess from './pages/OrderSuccess';
 import { Navigate } from 'react-router-dom';
 import ForgotPassword from './pages/ForgotPassword';
 import AdminShipping from './pages/admin/AdminShipping';
+import AdminShippingConfig from './pages/admin/AdminShippingConfig';
 import AdminSuppliers from './pages/admin/AdminSuppliers';
+import AdminStores from './pages/admin/AdminStores';
 import VoucherProducts from './pages/VoucherProducts';
 
 const AppShell = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isAdminRoute = location.pathname.startsWith('/admin');
+  const { user } = useContext(AuthContext);
 
   // Lắng nghe sự kiện 401 từ axiosClient → chuyển trang bằng React Router (không reload)
   useEffect(() => {
@@ -48,6 +58,17 @@ const AppShell = () => {
     window.addEventListener(AUTH_REDIRECT_EVENT, handleAuthRedirect);
     return () => window.removeEventListener(AUTH_REDIRECT_EVENT, handleAuthRedirect);
   }, [navigate]);
+
+  // Chặn khách hàng chưa có địa chỉ vào hệ thống chính, buộc chuyển sang trang cập nhật cá nhân
+  useEffect(() => {
+    if (user && user.role === 'CUSTORMER' && !user.province) {
+      // Cho phép truy cập route profile hoặc logout
+      if (!location.pathname.startsWith('/profile') && location.pathname !== '/login') {
+        toast.error("Vui lòng cập nhật tỉnh/thành phố để tiếp tục sử dụng hệ thống", { id: 'address-warning' });
+        navigate('/profile?tab=info', { replace: true });
+      }
+    }
+  }, [user, location.pathname, navigate]);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -75,6 +96,7 @@ const AppShell = () => {
           >
             <Route index element={<AdminDashboard />} />
             <Route path="products" element={<AdminProducts />} />
+            <Route path="store-products" element={<AdminStoreProducts />} />
             <Route path="products/new" element={<AdminProductForm />} />
             <Route path="products/edit/:id" element={<AdminProductForm />} />
             <Route path="categories" element={<AdminCategories />} />
@@ -86,10 +108,15 @@ const AppShell = () => {
             <Route path="suppliers" element={<AdminSuppliers />} />
             <Route path="stock-receipts" element={<AdminStockReceipts />} />
             <Route path="stock-receipts/new" element={<AdminStockReceiptForm />} />
+            <Route path="import-units" element={<AdminImportUnits />} />
+            <Route path="inventory" element={<AdminInventory />} />
+            <Route path="accounts" element={<AdminAccounts />} />
             <Route path="customers" element={<AdminCustomers />} />
             <Route path="notifications" element={<AdminNotifications />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="shipping" element={<AdminShipping />} />
+            <Route path="shipping/config" element={<AdminShippingConfig />} />
+            <Route path="stores" element={<AdminStores />} />
 
           </Route>
 
@@ -125,7 +152,9 @@ const AppShell = () => {
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <AppShell />
+      <NotificationProvider>
+        <AppShell />
+      </NotificationProvider>
     </Router>
   );
 }

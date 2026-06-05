@@ -38,6 +38,9 @@ class OrderServiceTest {
         CartRepository cartRepository = mock(CartRepository.class);
         ProductUnitRepository productUnitRepository = mock(ProductUnitRepository.class);
 
+        InventoryRepository inventoryRepository = mock(InventoryRepository.class);
+        StoreRepository storeRepository = mock(StoreRepository.class);
+
         orderService = new OrderService(
             orderRepository,
             userRepository,
@@ -48,7 +51,9 @@ class OrderServiceTest {
             notificationService,
             voucherService,
             cartRepository,
-            productUnitRepository
+            productUnitRepository,
+            inventoryRepository,
+            storeRepository
         );
     }
 

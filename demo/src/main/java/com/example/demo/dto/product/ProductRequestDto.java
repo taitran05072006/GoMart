@@ -12,7 +12,7 @@ public class ProductRequestDto {
     private Integer price;
     private Integer oldPrice;
     private Integer discount;
-    private double rating;
+    private Double rating;
     private Integer reviews;
     private String tag;
     private String unit;
@@ -23,5 +23,10 @@ public class ProductRequestDto {
     private Integer newBatchQuantity;
     private LocalDate manufactureDate;
     private LocalDate expiryDate;
+    private Long importUnitTypeId;
+    private String importUnitName;
+    private Double importConversionRate;
     private List<ProductUnitDto> units;
+    private List<ImportUnitDto> importUnits;
+    private Boolean isSelling;
 }

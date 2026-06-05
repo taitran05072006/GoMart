@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import cartService from "../services/cartService";
 import { AuthContext } from "./AuthContext";
+import { AUTH_REDIRECT_EVENT } from "../api/axiosClient";
 
 export const CartContext = createContext();
 
@@ -68,7 +69,10 @@ export const CartProvider = ({ children }) => {
   // ADD TO CART
   // =========================
   const addToCart = useCallback(async (productId, qty = 1, unit = null, conversionRate = 1.0) => {
-    if (!user?.id) return { success: false, message: "Login required" };
+    if (!user?.id) {
+      window.dispatchEvent(new Event(AUTH_REDIRECT_EVENT));
+      return { success: false, message: "Vui lòng đăng nhập" };
+    }
 
     try {
       const res = await cartService.addItem(user.id, productId, qty, unit, conversionRate);

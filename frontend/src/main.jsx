@@ -5,7 +5,6 @@ import './index.css'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { CartProvider } from './context/CartContext.jsx'
-import { NotificationProvider } from './context/NotificationContext.jsx'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProductProvider } from './context/ProductContext.jsx'
 import { VoucherProvider } from './context/VoucherContext.jsx'
@@ -34,18 +33,16 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AuthProvider>
       <ProductProvider>
-        <NotificationProvider>
-          <CartProvider>
-            <VoucherProvider>
-              <PaymentProvider>
-                <QueryClientProvider client={queryClient}>
-                  <App />
-                  <Toaster position="top-right" />
-                </QueryClientProvider>
-              </PaymentProvider>
-            </VoucherProvider>
-          </CartProvider>
-        </NotificationProvider>
+        <CartProvider>
+          <VoucherProvider>
+            <PaymentProvider>
+              <QueryClientProvider client={queryClient}>
+                <App />
+                <Toaster position="top-right" />
+              </QueryClientProvider>
+            </PaymentProvider>
+          </VoucherProvider>
+        </CartProvider>
       </ProductProvider>
     </AuthProvider>
   </React.StrictMode>,

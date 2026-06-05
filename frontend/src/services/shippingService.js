@@ -1,9 +1,9 @@
 import axiosClient from '../api/axiosClient';
 
 const shippingService = {
-  calculateFee: async (address, subtotal) => {
+  calculateFee: async ({ address, subtotal, lat, lng, storeId } = {}) => {
     return axiosClient.get('/shipping/calculate', {
-      params: { address, subtotal },
+      params: { address, subtotal, lat, lng, storeId },
     });
   },
   getLocations: async () => {

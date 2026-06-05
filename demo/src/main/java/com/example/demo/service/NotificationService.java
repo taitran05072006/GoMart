@@ -39,9 +39,24 @@ public class NotificationService {
     public List<NotificationResponseDto> broadcastToAllCustomers(NotificationBroadcastRequestDto request) {
         validateRequest(request);
 
+        User sender = null;
+        if (request.getSenderId() != null) {
+            sender = userRepository.findById(request.getSenderId()).orElse(null);
+        }
+
+        final User finalSender = sender;
         List<User> users = userRepository.findAll().stream()
-                .filter(user -> user.getRole() != Role.ADMIN)
-                .toList();
+            .filter(user -> user.getRole() != Role.SUPER_ADMIN && user.getRole() != Role.STORE_ADMIN)
+            .filter(user -> {
+                if (finalSender != null && finalSender.getRole() == Role.STORE_ADMIN) {
+                    if (finalSender.getStore() == null || user.getStore() == null) {
+                        return false;
+                    }
+                    return finalSender.getStore().getId().equals(user.getStore().getId());
+                }
+                return true;
+            })
+            .toList();
 
         List<NotificationResponseDto> created = new ArrayList<>();
         for (User user : users) {
@@ -53,8 +68,9 @@ public class NotificationService {
 
     public NotificationResponseDto sendOrderSuccessNotification(User user, Long orderId, String orderCode) {
         String title = "ĐAT HANG THANH CONG";
+        String orderRef = orderCode != null ? orderCode : String.valueOf(orderId);
         String message = "Đơn hàng " + (orderCode != null ? orderCode : ("#" + orderId)) + " đã được tạo thành công.";
-        return sendToUser(user, title, message, "/profile?tab=orders");
+        return sendToUser(user, title, message, "/profile?tab=orders&orderId=" + orderRef);
     }
 
     public void sendNewOrderNotificationToAdmins(Order order) {
@@ -62,7 +78,7 @@ public class NotificationService {
             return;
         }
 
-        List<User> admins = userRepository.findByRoleOrderByNameAsc(Role.ADMIN);
+        List<User> admins = userRepository.findByRoleInOrderByNameAsc(java.util.Arrays.asList(Role.SUPER_ADMIN, Role.STORE_ADMIN));
         if (admins.isEmpty()) {
             return;
         }
@@ -75,7 +91,7 @@ public class NotificationService {
         String message = "Có đơn hàng mới " + orderRef + " từ " + customerName + ".";
 
         for (User admin : admins) {
-            sendToUser(admin, title, message, "/admin/orders");
+            sendToUser(admin, title, message, "/admin/orders?orderId=" + (order.getOrderCode() != null ? order.getOrderCode() : String.valueOf(order.getId())));
         }
     }
 
@@ -89,7 +105,7 @@ public class NotificationService {
         String toLabel = toStatus.name();
         String title = "Cập nhật đơn hàng";
         String message = "Đơn hàng " + orderRef + " đã chuyển từ " + fromLabel + " sang " + toLabel + ".";
-        sendToUser(order.getUser(), title, message, "/profile?tab=orders");
+        sendToUser(order.getUser(), title, message, "/profile?tab=orders&orderId=" + (order.getOrderCode() != null ? order.getOrderCode() : String.valueOf(order.getId())));
     }
 
     public void sendOrderAssignedShipperToCustomer(Order order) {
@@ -103,7 +119,7 @@ public class NotificationService {
                 : "Shipper";
         String title = "Đơn hàng đã được gán cho shipper";
         String message = "Đơn hàng " + orderRef + " đã được phân cho " + shipperName + ".";
-        sendToUser(order.getUser(), title, message, "/profile?tab=orders");
+        sendToUser(order.getUser(), title, message, "/profile?tab=orders&orderId=" + (order.getOrderCode() != null ? order.getOrderCode() : String.valueOf(order.getId())));
     }
 
     public void sendOrderAssignedToShipper(Order order) {
@@ -118,17 +134,17 @@ public class NotificationService {
 
         String title = "Bạn được giao đơn mới";
         String message = "Đơn " + orderRef + " của " + customerName + " vừa được giao cho bạn.";
-        sendToUser(order.getAssignedShipper(), title, message, "/shipper/orders");
+        sendToUser(order.getAssignedShipper(), title, message, "/shipper/orders?orderId=" + (order.getOrderCode() != null ? order.getOrderCode() : String.valueOf(order.getId())));
     }
 
     public void sendExpiryWarningNotification(Product product, long daysUntilExpiry) {
         if (product == null) return;
 
-        List<User> admins = userRepository.findByRoleOrderByNameAsc(Role.ADMIN);
+        List<User> admins = userRepository.findByRoleInOrderByNameAsc(java.util.Arrays.asList(Role.SUPER_ADMIN, Role.STORE_ADMIN));
         String title = "Cảnh báo hết hạn sản phẩm";
-        String message = String.format("Sản phẩm '%s' (ID: %d) còn %d ngày là hết hạn.", 
+        String message = String.format("Sản phẩm '%s' (ID: %d) còn %d ngày là hết hạn.",
                 product.getName(), product.getId(), daysUntilExpiry);
-        
+
         for (User admin : admins) {
             sendToUser(admin, title, message, "/admin/products");
         }

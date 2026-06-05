@@ -17,9 +17,17 @@ public class ShippingController {
 
     @GetMapping("/calculate")
     public ApiResponse<Double> calculateFee(
-            @RequestParam String address,
-            @RequestParam Double subtotal) {
-        Double fee = shippingService.calculateShippingFee(address, subtotal);
+            @RequestParam(required = false) String address,
+            @RequestParam(required = false) Double subtotal,
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng,
+            @RequestParam(required = false) Long storeId) {
+        Double fee;
+        if (lat != null && lng != null) {
+            fee = shippingService.calculateShippingFeeByCoordinates(lat, lng, subtotal, storeId);
+        } else {
+            fee = shippingService.calculateShippingFee(address, subtotal);
+        }
         return ApiResponse.success("Phí vận chuyển đã được tính toán", fee);
     }
 }

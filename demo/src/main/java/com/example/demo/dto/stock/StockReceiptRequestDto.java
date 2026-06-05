@@ -10,5 +10,6 @@ public class StockReceiptRequestDto {
     private String code;
     private String note;
     private Long supplierId;
+    private Long storeId;
     private List<StockReceiptItemRequestDto> items;
 }

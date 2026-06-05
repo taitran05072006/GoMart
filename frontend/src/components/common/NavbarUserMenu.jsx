@@ -49,7 +49,7 @@ const NavbarUserMenu = () => {
       Đơn hàng
     </Link>
 
-    {user?.role === 'ADMIN' && (
+    {['SUPER_ADMIN', 'STORE_ADMIN'].includes(user?.role) && (
       <Link className="block px-4 py-2 hover:bg-gray-100 font-semibold text-green-600" to="/admin">
         Trang quản trị
       </Link>

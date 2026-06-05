@@ -9,4 +9,5 @@ public class SupplierRequestDto {
     private String address;
     private String email;
     private String supplyType;
+    private Long storeId;
 }

@@ -34,4 +34,5 @@ public class OrderResponseDto {
     private String shippingVoucherCode;
     private LocalDateTime actualDeliveryTime;
     private Integer rating;
+    private Long storeId;
 }

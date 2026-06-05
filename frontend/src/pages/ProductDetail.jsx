@@ -53,8 +53,8 @@ const ProductDetail = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 bg-[#f8fafc] min-h-screen">
-      <button 
-        onClick={handleBack} 
+      <button
+        onClick={handleBack}
         className="flex items-center gap-2 text-slate-900 hover:text-blue-600 mb-8 font-black transition-all group uppercase tracking-widest text-xs"
       >
         <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
@@ -78,11 +78,11 @@ const ProductDetail = () => {
           <div className="text-xs font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">
              {product.category || 'GIA VỊ & ĐỒ KHÔ'}
           </div>
-          
+
           <h1 className="text-4xl lg:text-5xl font-black text-slate-900 mb-6 leading-[1.1]">
             {product.name}
           </h1>
-          
+
           <div className="text-4xl font-black text-rose-600 mb-8 tracking-tighter">
             {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(currentPrice)}
           </div>
@@ -104,12 +104,12 @@ const ProductDetail = () => {
                   className={`group relative px-8 py-4 rounded-2xl border-2 transition-all duration-300 flex flex-col items-start min-w-[140px] ${!selectedUnit ? 'border-indigo-600 bg-indigo-50 shadow-xl shadow-indigo-100/50' : 'border-slate-100 bg-white hover:border-slate-200'}`}
                 >
                   <span className={`text-sm font-black uppercase tracking-tight ${!selectedUnit ? 'text-indigo-600' : 'text-slate-500'}`}>
-                    {product.unit || 'Mặc định'}
+                    {(product.unit || (product.units && product.units[0]?.name) || 'Mặc định')}
                   </span>
                   <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Gốc</span>
                   {!selectedUnit && <div className="absolute -top-2 -right-2 bg-indigo-600 text-white rounded-full p-1.5 shadow-lg ring-4 ring-white"><Check size={12} strokeWidth={4} /></div>}
                 </button>
-                
+
                 {product.units && product.units.map((u, i) => (
                   <button
                     key={i}
@@ -148,11 +148,12 @@ const ProductDetail = () => {
 
           {/* Action Buttons */}
           <div className="flex gap-4 mt-auto">
-             <button 
-                onClick={handleAddToCart} 
-                className="flex-1 bg-[#5b51ef] text-white py-5 rounded-[2.5rem] font-black text-xl shadow-[0_15px_40px_rgba(91,81,239,0.3)] hover:bg-[#4a40d6] hover:-translate-y-1 transition-all flex items-center justify-center gap-4 active:scale-95"
+             <button
+                onClick={handleAddToCart}
+                disabled={Number(product.stock || 0) <= 0}
+                className={`flex-1 text-white py-5 rounded-[2.5rem] font-black text-xl shadow-[0_15px_40px_rgba(91,81,239,0.3)] transition-all flex items-center justify-center gap-4 ${Number(product.stock || 0) <= 0 ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-[#5b51ef] hover:bg-[#4a40d6] hover:-translate-y-1 active:scale-95'}`}
              >
-                <ShoppingCart size={26} /> Thêm Vào Giỏ Hàng
+                <ShoppingCart size={26} /> {Number(product.stock || 0) <= 0 ? 'Hết hàng' : 'Thêm Vào Giỏ Hàng'}
              </button>
              <button className="p-5 rounded-[2.5rem] border-2 border-slate-100 text-slate-300 hover:text-rose-500 hover:border-rose-100 transition-all active:scale-90 bg-white shadow-sm">
                 <Heart size={30} />

@@ -19,8 +19,14 @@ const authService = {
   getAdminShippers: async () => {
     return axiosClient.get('/users/admin/shippers');
   },
-  updateUserRole: async (userId, role) => {
-    return axiosClient.patch(`/users/admin/customers/${userId}/role`, { role });
+  getAdminStoreAdmins: async () => {
+    return axiosClient.get('/users/admin/store-admins');
+  },
+  createAdminAccount: async (data) => {
+    return axiosClient.post('/users/admin/accounts', data);
+  },
+  updateUserRole: async (userId, role, storeId) => {
+    return axiosClient.patch(`/users/admin/customers/${userId}/role`, { role, storeId });
   },
   deleteAdminCustomer: async (userId) => {
     return axiosClient.delete(`/users/admin/customers/${userId}`);

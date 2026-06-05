@@ -5,4 +5,5 @@ import lombok.Data;
 @Data
 public class UpdateUserRoleRequestDto {
     private String role;
+    private Long storeId;
 }

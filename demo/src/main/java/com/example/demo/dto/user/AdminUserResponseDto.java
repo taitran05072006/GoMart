@@ -14,5 +14,7 @@ public class AdminUserResponseDto {
     private String phone;
     private String address;
     private String role;
+    private Long storeId;
+    private String storeName;
     private LocalDateTime createdAt;
 }

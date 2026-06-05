@@ -13,6 +13,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import jakarta.servlet.http.HttpServletRequest;
+import com.example.demo.entity.User;
+import com.example.demo.repository.UserRepository;
+import com.example.demo.entity.Role;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -21,6 +25,9 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    private final UserRepository userRepository;
+
+
 
     /**
      * Tạo order mới
@@ -40,11 +47,70 @@ public class OrderController {
     }
 
     /**
+     * Preview order totals without creating an order.
+     */
+    @PostMapping("/preview")
+    public ApiResponse<OrderResponseDto> previewOrder(
+            @RequestBody OrderRequestDto dto,
+            @RequestParam(required = false) String voucher
+    ) {
+        try {
+            return ApiResponse.success("Preview calculated", orderService.previewOrder(dto, voucher));
+        } catch (Exception ex) {
+            return ApiResponse.error(ex.getMessage());
+        }
+    }
+
+    /**
      * Lấy tất cả order
      */
     @GetMapping
-    public ApiResponse<List<OrderResponseDto>> getAll() {
-        return ApiResponse.success("Lấy tất cả đơn hàng thành công", orderService.getAllOrders());
+    public ApiResponse<List<OrderResponseDto>> getAll(HttpServletRequest request) {
+        String uid = request.getHeader("X-User-Id");
+        String impersonateStoreIdStr = request.getHeader("X-Impersonate-Store-Id");
+        if (uid == null) return ApiResponse.error("Forbidden");
+        try {
+            Long id = Long.parseLong(uid);
+            User u = userRepository.findById(id).orElse(null);
+            if (u == null) return ApiResponse.error("Forbidden");
+            if (u.getRole() == Role.SUPER_ADMIN) {
+                if (impersonateStoreIdStr != null && !impersonateStoreIdStr.isBlank() && !impersonateStoreIdStr.equals("null") && !impersonateStoreIdStr.equals("undefined")) {
+                    try {
+                        Long impersonateStoreId = Long.parseLong(impersonateStoreIdStr);
+                        return ApiResponse.success("Lấy tất cả đơn hàng cửa hàng thành công", orderService.getOrdersByStoreId(impersonateStoreId));
+                    } catch (NumberFormatException ignored) {}
+                }
+                return ApiResponse.success("Lấy tất cả đơn hàng thành công", orderService.getAllOrders());
+            }
+            if (u.getRole() == Role.STORE_ADMIN) {
+                if (u.getStore() == null) return ApiResponse.success("Lấy đơn hàng thành công", List.of());
+                return ApiResponse.success("Lấy đơn hàng store thành công", orderService.getOrdersByStoreId(u.getStore().getId()));
+            }
+            return ApiResponse.error("Forbidden");
+        } catch (NumberFormatException ex) {
+            return ApiResponse.error("Forbidden");
+        }
+    }
+
+    /**
+     * Lấy orders của user hiện tại (khách hàng)
+     */
+    @GetMapping("/user/{userId}")
+    public ApiResponse<List<OrderResponseDto>> getOrdersByUser(@PathVariable Long userId, HttpServletRequest request) {
+        String uid = request.getHeader("X-User-Id");
+        if (uid == null) return ApiResponse.error("Forbidden");
+        try {
+            Long requesterId = Long.parseLong(uid);
+            // allow users to fetch their own orders or admins to fetch any
+            User requester = userRepository.findById(requesterId).orElse(null);
+            if (requester == null) return ApiResponse.error("Forbidden");
+            if (!requester.getId().equals(userId) && requester.getRole() != Role.SUPER_ADMIN) {
+                return ApiResponse.error("Forbidden");
+            }
+            return ApiResponse.success("Lấy đơn hàng người dùng thành công", orderService.getOrdersByUserId(userId));
+        } catch (NumberFormatException ex) {
+            return ApiResponse.error("Forbidden");
+        }
     }
 
     @GetMapping("/shipper/{shipperId}")

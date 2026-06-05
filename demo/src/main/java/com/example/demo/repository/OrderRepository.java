@@ -10,9 +10,11 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
-    List<Order> findByUserId(Long userId);
+    List<Order> findByUserIdOrderByCreatedAtDesc(Long userId);
     List<Order> findByAssignedShipperIdOrderByCreatedAtDesc(Long shipperId);
     List<Order> findByStatusAndActualDeliveryTimeBefore(OrderStatus status, LocalDateTime time);
     java.util.Optional<Order> findByOrderCode(String orderCode);
     java.util.Optional<Order> findByOrderCodeContaining(String partialOrderCode);
+
+    List<Order> findByStoreIdOrderByCreatedAtDesc(Long storeId);
 }

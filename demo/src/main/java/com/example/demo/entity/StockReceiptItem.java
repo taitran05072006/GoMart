@@ -29,4 +29,9 @@ public class StockReceiptItem {
     private Double price;
     private java.time.LocalDate manufactureDate;
     private java.time.LocalDate expiryDate;
+    @ManyToOne
+    @JoinColumn(name = "import_unit_type_id")
+    private com.example.demo.entity.ImportUnitType importUnitType;
+
+    private Double importConversionRate; // conversion to product base unit
 }

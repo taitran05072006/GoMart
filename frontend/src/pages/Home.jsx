@@ -9,8 +9,8 @@ import ProductCard from '../components/common/ProductCard';
 import toast from 'react-hot-toast';
 
 // Fetch function
-const fetchProducts = async () => {
-    const res = await productService.getAll();
+const fetchProducts = async (storeId) => {
+    const res = storeId ? await productService.getByStoreId(storeId) : await productService.getAll();
     return res?.data ?? res;
 };
 
@@ -20,14 +20,15 @@ const formatVND = new Intl.NumberFormat("vi-VN", {
 });
 
 const Home = () => {
+    const { user } = useContext(AuthContext);
+
     const { data = [], isLoading, isError } = useQuery({
-        queryKey: ['products'],
-        queryFn: fetchProducts,
+        queryKey: ['products', user?.storeId],
+        queryFn: () => fetchProducts(user?.storeId),
         staleTime: 1000 * 60 * 5, // cache 5 minutes
     });
 
     const { availableVouchers, fetchAvailableVouchers, myVouchers, collectVoucher, fetchMyVouchers } = useContext(VoucherContext);
-    const { user } = useContext(AuthContext);
     const navigate = useNavigate();
     const [activeSlide, setActiveSlide] = useState(0);
     const [activeVoucherTab, setActiveVoucherTab] = useState('PRODUCT'); // 'PRODUCT' or 'SHIPPING'
@@ -39,7 +40,7 @@ const Home = () => {
         }
     }, [user?.id]);
 
-    const featured = Array.isArray(data) ? data : (data?.data || []);
+    const featured = Array.isArray(data) ? data.filter(p => Number(p.stock || 0) > 0) : (data?.data ? data.data.filter(p => Number(p.stock || 0) > 0) : []);
 
     const slides = [
         {
@@ -87,9 +88,7 @@ const Home = () => {
                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20" />
 
                         <div className="relative z-10 max-w-2xl text-white space-y-6">
-                            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/30 text-xs font-bold tracking-widest uppercase">
-                                <Zap size={14} className="text-yellow-300" /> Flash Sale Đang Diễn Ra
-                            </div>
+                            {/* Badge removed as requested */}
                             <h1 className="text-5xl md:text-7xl font-black italic uppercase leading-none tracking-tighter drop-shadow-2xl">
                                 {slide.title}
                             </h1>
@@ -191,8 +190,8 @@ const Home = () => {
                             const isUsed = v.isUsed;
 
                             return (
-                                <div 
-                                    key={v.code} 
+                                <div
+                                    key={v.code}
                                     className={`group relative flex items-stretch bg-white border border-slate-100 rounded-[32px] overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 cursor-pointer ${isUsed ? 'opacity-70 grayscale-[0.5]' : ''}`}
                                     onClick={() => {
                                         if (isUsed) return;
@@ -230,7 +229,7 @@ const Home = () => {
                                                 <span>Còn lại {Math.max(0, (v.usageLimit || 0) - (v.usedCount || 0))} lượt</span>
                                             </div>
                                             <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                <div 
+                                                <div
                                                     className={`h-full transition-all duration-1000 ${isUsed ? 'bg-slate-300' : activeVoucherTab === 'SHIPPING' ? 'bg-emerald-500' : 'bg-blue-600'}`}
                                                     style={{ width: `${Math.min(100, ((v.usedCount || 0) / (v.usageLimit || 1)) * 100)}%` }}
                                                 />

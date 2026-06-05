@@ -4,17 +4,26 @@ const productService = {
   getAll: async () => {
     return axiosClient.get('/products');
   },
-  create: async (data) => {
-    return axiosClient.post('/products', data);
+  getByStoreId: async (storeId) => {
+    return axiosClient.get(`/stores/${storeId}/products`);
   },
-  getById: async (id) => {
-    return axiosClient.get(`/products/${id}`);
+  create: async (data, storeId) => {
+    return axiosClient.post('/products', data, { params: { storeId } });
+  },
+  getById: async (id, storeId) => {
+    return axiosClient.get(`/products/${id}`, { params: { storeId } });
   },
   update: async (id, data) => {
     return axiosClient.put(`/products/${id}`, data);
   },
+  updateForStore: async (id, data, storeId) => {
+    return axiosClient.put(`/products/${id}`, data, { params: { storeId } });
+  },
   delete: async (id) => {
     return axiosClient.delete(`/products/${id}`);
+  },
+  toggleSelling: async (id, storeId) => {
+    return axiosClient.post(`/products/${id}/store/${storeId}/toggle-selling`);
   },
   getByCategory: async (categoryId) => {
     return axiosClient.get(`/products/category/${categoryId}`);

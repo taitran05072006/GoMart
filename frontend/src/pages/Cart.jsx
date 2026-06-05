@@ -297,12 +297,6 @@ const Cart = () => {
               <span>Tạm tính</span>
               <span>{formatVND.format(selectedTotal)}</span>
             </div>
-
-            <div className="flex justify-between mb-6">
-              <span>Vận chuyển</span>
-              <span className="text-green-600">Miễn phí</span>
-            </div>
-
             <div className="border-t pt-4 flex justify-between font-bold text-lg mb-6">
               <span>Tổng</span>
               <span className="text-red-500">

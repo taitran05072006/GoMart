@@ -45,6 +45,9 @@ AND (:maxPrice IS NULL OR p.price <= :maxPrice)
     @Query("SELECT p FROM Product p WHERE p.expiryDate < CURRENT_DATE AND p.isDeleted = false")
     List<Product> findByExpiryDateBeforeAndIsDeletedFalse();
 
+    @Query("SELECT p FROM Product p JOIN com.example.demo.entity.Inventory i ON i.product = p WHERE i.store.id = :storeId AND i.quantity > 0 AND p.isDeleted = false")
+    List<Product> findAvailableByStoreId(@Param("storeId") Long storeId);
+
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "UPDATE products SET version = 0 WHERE version IS NULL", nativeQuery = true)

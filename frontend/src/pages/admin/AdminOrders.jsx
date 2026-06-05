@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useContext } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Search, Filter, Download, Plus, Eye, MoreVertical,
@@ -67,8 +67,9 @@ const badgeClass = (status) => {
 };
 
 const AdminOrders = () => {
-  const { user } = useContext(AuthContext);
+  const { user, impersonatedStoreId } = useContext(AuthContext);
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const urlStatus = searchParams.get('status') || 'ALL';
 
   const [orders, setOrders] = useState([]);
@@ -93,6 +94,17 @@ const AdminOrders = () => {
   const [unreadCountsByOrder, setUnreadCountsByOrder] = useState({});
   const [autoOpenChat, setAutoOpenChat] = useState(false);
 
+  useEffect(() => {
+    const orderIdParam = searchParams.get('orderId');
+    if (orderIdParam && orders.length > 0) {
+      const found = orders.find(o => String(o.id) === String(orderIdParam) || String(o.orderCode) === String(orderIdParam));
+      if (found) {
+        setSelectedOrder(found);
+        setShowDetailModal(true);
+      }
+    }
+  }, [orders, searchParams]);
+
   const loadOrders = async () => {
     setLoading(true);
     try {
@@ -114,6 +126,12 @@ const AdminOrders = () => {
       const shipperResponse = await authService.getAdminShippers();
       const shipperData = shipperResponse?.data || [];
 
+      // Sort orders newest-first by orderDate or createdAt so new orders appear at the top
+      orderList.sort((a, b) => {
+        const ta = new Date(a.orderDate || a.createdAt || 0).getTime();
+        const tb = new Date(b.orderDate || b.createdAt || 0).getTime();
+        return tb - ta;
+      });
       setOrders(orderList);
       setPayments(Object.fromEntries(paymentPairs));
       setShippers(Array.isArray(shipperData) ? shipperData : []);
@@ -155,7 +173,7 @@ const AdminOrders = () => {
 
   useEffect(() => {
     loadOrders();
-  }, []);
+  }, [impersonatedStoreId, user?.role]);
 
   // List-wide real-time chat notifications tracker for Admin
   useEffect(() => {
@@ -366,7 +384,7 @@ const AdminOrders = () => {
           )}
         </div>
         <div className="flex items-center gap-3">
-        
+
 
         </div>
       </div>
@@ -458,7 +476,19 @@ const AdminOrders = () => {
                 return (
                   <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
-                      <span className="text-sm font-bold text-blue-600 hover:underline cursor-pointer">#{order.orderCode || order.id}</span>
+                      <span 
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          setAutoOpenChat(false);
+                          setShowDetailModal(true);
+                          const params = new URLSearchParams(window.location.search);
+                          params.set('orderId', order.orderCode || order.id);
+                          navigate({ search: params.toString() }, { replace: true });
+                        }}
+                        className="text-sm font-bold text-blue-600 hover:underline cursor-pointer"
+                      >
+                        #{order.orderCode || order.id}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -504,6 +534,9 @@ const AdminOrders = () => {
                               ...prev,
                               [order.id]: 0
                             }));
+                            const params = new URLSearchParams(window.location.search);
+                            params.set('orderId', order.orderCode || order.id);
+                            navigate({ search: params.toString() }, { replace: true });
                           }}
                           className={`relative p-2 rounded-lg transition-all ${
                             unreadCountsByOrder[order.id] > 0
@@ -524,6 +557,9 @@ const AdminOrders = () => {
                             setSelectedOrder(order);
                             setAutoOpenChat(false);
                             setShowDetailModal(true);
+                            const params = new URLSearchParams(window.location.search);
+                            params.set('orderId', order.orderCode || order.id);
+                            navigate({ search: params.toString() }, { replace: true });
                           }}
                           className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                           title="Xem chi tiết"
@@ -586,7 +622,12 @@ const AdminOrders = () => {
           shippers={shippers}
           shipperId={shipperByOrder[selectedOrder.id]}
           onSetShipperId={(id) => setShipperByOrder(prev => ({ ...prev, [selectedOrder.id]: id }))}
-          onClose={() => setShowDetailModal(false)}
+          onClose={() => {
+            setShowDetailModal(false);
+            const params = new URLSearchParams(window.location.search);
+            params.delete('orderId');
+            navigate({ search: params.toString() }, { replace: true });
+          }}
           onUpdateStatus={updateStatus}
           onConfirmCod={confirmCodToPacking}
           onAssignShipper={assignShipper}
@@ -790,16 +831,7 @@ const OrderDetailModal = ({
                 </button>
               )}
 
-              {payment?.method === 'BANK_TRANSFER' && payment?.status === 'PAID' && order.status === 'PAID' && (
-                <button
-                  onClick={() => onUpdateStatus(order.id, 'CONFIRMED')}
-                  className="rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all"
-                >
-                  Xác nhận thanh toán & Chờ đóng gói
-                </button>
-              )}
-
-              {order.status === 'CONFIRMED' && (
+              {(order.status === 'CONFIRMED' || (payment?.method === 'BANK_TRANSFER' && payment?.status === 'PAID' && order.status === 'PAID')) && (
                 <button
                   onClick={() => onUpdateStatus(order.id, 'PACKING')}
                   className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-100 hover:bg-violet-700 transition-all"
@@ -822,9 +854,14 @@ const OrderDetailModal = ({
                   </select>
                   <button
                     onClick={() => onAssignShipper(order.id)}
-                    className="rounded-lg bg-slate-900 px-4 py-1.5 text-sm font-bold text-white hover:bg-slate-700 transition-all"
+                    disabled={Number(shipperId) === Number(order.shipperId) && order.shipperId != null}
+                    className={`rounded-lg px-4 py-1.5 text-sm font-bold transition-all ${
+                      Number(shipperId) === Number(order.shipperId) && order.shipperId != null
+                        ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed'
+                        : 'bg-slate-900 text-white hover:bg-slate-700'
+                    }`}
                   >
-                    Gán Shipper
+                    {Number(shipperId) === Number(order.shipperId) && order.shipperId != null ? '✓ Đã gán' : (order.shipperId ? 'Đổi Shipper' : 'Gán Shipper')}
                   </button>
                 </div>
               )}
@@ -903,7 +940,7 @@ const OrderDetailModal = ({
                 <span>💬</span> Hộp thoại hỗ trợ khách hàng
               </h4>
               <div className="flex justify-center bg-slate-50/50 rounded-3xl border border-slate-100/80 py-6 px-12">
-                <button 
+                <button
                   onClick={() => {
                     setShowChatModal(true);
                     setUnreadCount(0);
@@ -912,7 +949,7 @@ const OrderDetailModal = ({
                 >
                   <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-200/80 group-hover:shadow-blue-300/80 transition-all duration-300 group-hover:scale-110 active:scale-95 relative">
                     <UserIcon size={26} className="group-hover:rotate-12 transition-transform duration-300" />
-                    
+
                     {unreadCount > 0 ? (
                       <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md animate-bounce">
                         {unreadCount}
@@ -936,14 +973,14 @@ const OrderDetailModal = ({
                 <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
                   <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md" onClick={() => setShowChatModal(false)}></div>
                   <div className="relative w-full max-w-xl animate-in zoom-in-95 duration-200 flex flex-col gap-4">
-                    
+
                     {/* Elegant Header Above the Chat Box */}
                     <div className="flex items-center justify-between text-slate-800 bg-white/95 backdrop-blur px-6 py-4 rounded-2xl shadow-sm border border-slate-100/50">
                       <div className="flex items-center gap-2">
                         <span className="text-xl">💬</span>
                         <span className="font-bold text-slate-800 text-sm md:text-base">Trò chuyện với Khách hàng</span>
                       </div>
-                      <button 
+                      <button
                         onClick={() => setShowChatModal(false)}
                         className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-lg font-bold transition-all focus:outline-none"
                       >
@@ -953,11 +990,11 @@ const OrderDetailModal = ({
 
                     {/* Chat Box Container */}
                     <div className="h-[500px]">
-                      <OrderChat 
-                        order={order} 
-                        currentUser={currentUser} 
-                        role="ADMIN" 
-                        forcedChannel="CUSTOMER_ADMIN" 
+                      <OrderChat
+                        order={order}
+                        currentUser={currentUser}
+                        role="ADMIN"
+                        forcedChannel="CUSTOMER_ADMIN"
                       />
                     </div>
                   </div>

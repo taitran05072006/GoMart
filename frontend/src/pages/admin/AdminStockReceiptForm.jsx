@@ -1,9 +1,11 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useMemo, useState, useEffect, useContext } from 'react';
+import { useNavigate, Navigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import stockReceiptService from '../../services/StockReceipt';
+import { AuthContext } from '../../context/AuthContext';
+import { ArrowLeft } from 'lucide-react';
 
-const emptyItem = { productId: '', productName: '', quantity: 1, price: 0, unit: '', manufactureDate: '', expiryDate: '' };
+const emptyItem = { productId: '', productName: '', quantity: 1, price: 0, unit: '', manufactureDate: '', expiryDate: '', importUnitTypeId: '', importConversionRate: 1 };
 
 const AdminStockReceiptForm = () => {
   const navigate = useNavigate();
@@ -18,8 +20,22 @@ const AdminStockReceiptForm = () => {
   });
   const [allSuppliers, setAllSuppliers] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
+  const [allImportUnitTypes, setAllImportUnitTypes] = useState([]);
   const [showSupplierSuggestions, setShowSupplierSuggestions] = useState(false);
   const [productSuggestionsIndex, setProductSuggestionsIndex] = useState(-1);
+  const { user, impersonatedStoreId } = useContext(AuthContext);
+  const isGlobalMode = user?.role === 'SUPER_ADMIN' && !impersonatedStoreId;
+
+  if (user?.role !== 'SUPER_ADMIN' && user?.role !== 'STORE_ADMIN') {
+    return <Navigate to="/admin/store-products" replace />;
+  }
+
+  if (isGlobalMode) {
+    return <Navigate to="/admin/stock-receipts" replace />;
+  }
+
+  const selectedStoreId = user?.role === 'SUPER_ADMIN' ? impersonatedStoreId : user?.storeId;
+  const canCreateReceipt = Boolean(selectedStoreId);
   useEffect(() => {
     const handleClickOutside = () => {
       setShowSupplierSuggestions(false);
@@ -36,11 +52,33 @@ const AdminStockReceiptForm = () => {
         const data = res?.data?.data || res?.data || res;
         setAllSuppliers(Array.isArray(data) ? data : []);
       });
-      axios.get('/products').then(res => {
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selectedStoreId) {
+      setAllProducts([]);
+      return;
+    }
+    import('../../api/axiosClient').then(({ default: axios }) => {
+      axios.get(`/stores/${selectedStoreId}/products`).then(res => {
         const data = res?.data?.data || res?.data || res;
         setAllProducts(Array.isArray(data) ? data : []);
+      }).catch(err => {
+        console.error(err);
+        setAllProducts([]);
       });
     });
+  }, [selectedStoreId]);
+
+  // Load import unit types for datalist suggestions
+  useEffect(() => {
+    import('../../services/importUnitTypeService').then(({ default: s }) => {
+      s.getAll().then(res => {
+        const data = res?.data?.data || res?.data || res;
+        setAllImportUnitTypes(Array.isArray(data) ? data : []);
+      }).catch(() => setAllImportUnitTypes([]));
+    }).catch(() => setAllImportUnitTypes([]));
   }, []);
 
   const totalPrice = useMemo(() => {
@@ -100,38 +138,42 @@ const AdminStockReceiptForm = () => {
 
     setSaving(true);
 
+    if (!selectedStoreId) {
+      toast.error('Vui lòng chọn một cửa hàng trước khi tạo phiếu nhập');
+      return;
+    }
+
     const payload = {
       code: form.code.trim(),
       supplierId: Number(form.supplierId),
       supplier: form.supplierName.trim(),
       note: form.note.trim(),
+      storeId: Number(selectedStoreId),
       items: form.items.map((item) => {
         const product = allProducts.find(p => p.id === item.productId);
-        let finalQuantity = Number(item.quantity);
-        let finalPrice = Number(item.price);
-        
-        if (product) {
-          const selectedUnit = product.units?.find(u => u.name === item.unit);
-          if (selectedUnit && selectedUnit.conversionRate > 0) {
-            finalQuantity = Number(item.quantity) * selectedUnit.conversionRate;
-            finalPrice = Number(item.price) / selectedUnit.conversionRate;
-          }
-        }
-        
+        const conv = Number(item.importConversionRate) || 1;
+
+        // Map typed import unit name to existing importUnitType id if available
+        const matched = allImportUnitTypes.find(u => u.name === (item.importUnitName || ''));
+
         return {
           productId: Number(item.productId),
-          quantity: finalQuantity,
-          price: finalPrice,
-          unit: product ? (product.unit || 'chai') : item.unit,
-          manufactureDate: item.manufactureDate,
-          expiryDate: item.expiryDate,
+          quantity: Number(item.quantity),
+          price: Number(item.price),
+          unit: item.unit || (product ? (product.unit || 'chai') : 'chai'),
+          manufactureDate: item.manufactureDate || null,
+          expiryDate: item.expiryDate || null,
+          importUnitTypeId: matched ? Number(matched.id) : (item.importUnitTypeId ? Number(item.importUnitTypeId) : null),
+          importConversionRate: conv,
         };
       }),
     };
 
     try {
-      await stockReceiptService.create(payload);
-      toast.success('Stock receipt created successfully');
+      const resp = await stockReceiptService.create(payload);
+      const created = resp?.data?.data || resp?.data || resp;
+      toast.success(created?.status === 'PENDING' ? 'Phiếu nhập đã tạo, chờ SUPER_ADMIN duyệt' : 'Đã tạo phiếu nhập');
+
       navigate('/admin/stock-receipts');
     } catch (error) {
       console.error(error);
@@ -143,13 +185,29 @@ const AdminStockReceiptForm = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm hover:bg-slate-50 hover:shadow-md"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Quay lại
+        </button>
+      </div>
+
+      {!canCreateReceipt && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+          Hãy chọn một cửa hàng trước. Phiếu nhập được tạo theo cửa hàng và <strong>SUPER_ADMIN</strong> sẽ duyệt để cập nhật tồn kho.
+        </div>
+      )}
       <div className="rounded-3xl bg-slate-950 p-6 text-white">
         <p className="text-xs uppercase tracking-[0.3em] text-white/60">Nhập kho</p>
         <h2 className="mt-2 text-2xl font-black">Tạo phiếu nhập kho</h2>
         <p className="mt-2 text-sm text-white/70">Nhập supplierId và thông tin item để cập nhật tồn kho.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <fieldset disabled={!canCreateReceipt}>
+        <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid gap-4 lg:grid-cols-2">
           <Field label="Mã phiếu" name="code" value={form.code} onChange={handleRootChange} required />
           <div className="relative">
@@ -169,8 +227,8 @@ const AdminStockReceiptForm = () => {
             {showSupplierSuggestions && form.supplierName && (
               <div className="absolute z-10 w-full mt-1 bg-white border rounded-xl shadow-lg max-h-40 overflow-y-auto">
                 {allSuppliers.filter(s => s.name.toLowerCase().includes(form.supplierName.toLowerCase())).map(s => (
-                  <div 
-                    key={s.id} 
+                  <div
+                    key={s.id}
                     className="p-2 hover:bg-slate-50 cursor-pointer text-sm"
                     onClick={() => {
                       setForm(f => ({ ...f, supplierId: s.id, supplierName: s.name }));
@@ -209,7 +267,7 @@ const AdminStockReceiptForm = () => {
 
           <div className="space-y-3">
             {form.items.map((item, index) => (
-              <div key={index} className="grid gap-3 rounded-xl border border-slate-200 p-3 lg:grid-cols-[1.5fr_0.8fr_0.8fr_1fr_1.1fr_1.1fr_1.1fr_auto] items-start">
+              <div key={index} className="grid gap-3 rounded-xl border border-slate-200 p-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1.1fr_1.1fr_1.1fr_auto] items-start">
                 <div className="relative">
                   <label className="mb-2 block text-sm font-semibold text-slate-700">Sản phẩm *</label>
                   <input
@@ -228,13 +286,27 @@ const AdminStockReceiptForm = () => {
                   {productSuggestionsIndex === index && item.productName && (
                     <div className="absolute z-10 w-full mt-1 bg-white border rounded-xl shadow-lg max-h-40 overflow-y-auto">
                       {allProducts.filter(p => p.name.toLowerCase().includes(item.productName.toLowerCase())).map(p => (
-                        <div 
-                          key={p.id} 
+                        <div
+                          key={p.id}
                           className="p-2 hover:bg-slate-50 cursor-pointer text-xs"
                           onClick={() => {
                             handleItemChange(index, 'productId', p.id);
                             handleItemChange(index, 'productName', p.name);
                             handleItemChange(index, 'unit', p.unit || '');
+                            if (p.importUnits && p.importUnits.length > 0) {
+                              const firstUnit = p.importUnits[0];
+                              handleItemChange(index, 'importUnitTypeId', firstUnit.importUnitTypeId || '');
+                              handleItemChange(index, 'importUnitName', firstUnit.name || '');
+                              handleItemChange(index, 'importConversionRate', firstUnit.conversionRate || 1);
+                              // Auto populate costPrice if available
+                              if (firstUnit.costPrice) {
+                                handleItemChange(index, 'price', firstUnit.costPrice);
+                              }
+                            } else {
+                              handleItemChange(index, 'importUnitTypeId', p.importUnitTypeId || '');
+                              handleItemChange(index, 'importUnitName', p.importUnitName || '');
+                              handleItemChange(index, 'importConversionRate', p.importConversionRate || 1);
+                            }
                             setProductSuggestionsIndex(-1);
                           }}
                         >
@@ -244,42 +316,72 @@ const AdminStockReceiptForm = () => {
                     </div>
                   )}
                 </div>
-                {/* Đơn vị */}
+                {/* Đơn vị (hiển thị/nhập) */}
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">Đơn vị *</label>
-                  {(() => {
-                    const product = allProducts.find(p => p.id === item.productId);
-                    if (product) {
-                      const baseUnit = product.unit || 'chai';
-                      const extraUnits = product.units || [];
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Đơn vị</label>
+                  <input
+                    type="text"
+                    value={item.unit || ''}
+                    onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
+                    placeholder="e.g. chai, hộp"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+                  />
+                </div>
+                {/* Đơn vị nhập (gõ hoặc chọn) */}
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Đơn vị nhập</label>
+                  <div>
+                    {(() => {
+                      const product = allProducts.find(p => p.id === item.productId);
+                      if (product && product.importUnits && product.importUnits.length > 0) {
+                        return (
+                          <select
+                            value={item.importUnitName || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handleItemChange(index, 'importUnitName', val);
+                              const matchedUnit = product.importUnits.find(u => u.name === val);
+                              if (matchedUnit) {
+                                handleItemChange(index, 'importConversionRate', matchedUnit.conversionRate || 1);
+                                handleItemChange(index, 'importUnitTypeId', matchedUnit.importUnitTypeId || '');
+                                if (matchedUnit.costPrice) {
+                                  handleItemChange(index, 'price', matchedUnit.costPrice);
+                                }
+                              }
+                            }}
+                            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+                          >
+                            <option value="">-- Chọn đơn vị --</option>
+                            {product.importUnits.map((u, i) => (
+                              <option key={i} value={u.name}>{u.name} (x{u.conversionRate})</option>
+                            ))}
+                          </select>
+                        );
+                      }
                       return (
-                        <select
-                          value={item.unit || baseUnit}
-                          onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100 bg-white"
-                        >
-                          <option value={baseUnit}>{baseUnit} (Gốc)</option>
-                          {extraUnits.map(u => (
-                            <option key={u.name} value={u.name}>{u.name} (x{u.conversionRate})</option>
-                          ))}
-                        </select>
+                        <>
+                          <input
+                            type="text"
+                            list={`importUnitList-${index}`}
+                            placeholder="Nhập đơn vị nhập..."
+                            value={item.importUnitName || ''}
+                            onChange={(e) => handleItemChange(index, 'importUnitName', e.target.value)}
+                            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+                          />
+                          <datalist id={`importUnitList-${index}`}>
+                            {Array.from(new Set(allImportUnitTypes.map(u => u.name))).filter(Boolean).map((name, i) => (
+                              <option key={i} value={name} />
+                            ))}
+                          </datalist>
+                        </>
                       );
-                    } else {
-                      return (
-                        <select
-                          disabled
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-400 outline-none"
-                        >
-                          <option>Chọn sản phẩm...</option>
-                        </select>
-                      );
-                    }
-                  })()}
+                    })()}
+                  </div>
                 </div>
 
                 {/* Số lượng */}
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">Số lượng {item.unit ? `(${item.unit})` : ''} *</label>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Số lượng *</label>
                   <input
                     type="number"
                     min="1"
@@ -291,9 +393,9 @@ const AdminStockReceiptForm = () => {
                   {(() => {
                     const product = allProducts.find(p => p.id === item.productId);
                     if (product) {
-                      const selectedUnit = product.units?.find(u => u.name === item.unit);
-                      if (selectedUnit && selectedUnit.conversionRate > 1) {
-                        const baseQuantity = Number(item.quantity || 0) * selectedUnit.conversionRate;
+                      const conv = Number(item.importConversionRate) || 1;
+                      if (conv && conv > 0) {
+                        const baseQuantity = Math.round(Number(item.quantity || 0) * conv);
                         return (
                           <p className="mt-1 text-[11px] font-bold text-amber-600">
                             (= {baseQuantity} {product.unit || 'chai'})
@@ -307,7 +409,7 @@ const AdminStockReceiptForm = () => {
 
                 {/* Giá nhập */}
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">Giá nhập {item.unit ? `(${item.unit})` : ''} *</label>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Giá nhập *</label>
                   <input
                     type="number"
                     min="0"
@@ -319,9 +421,9 @@ const AdminStockReceiptForm = () => {
                   {(() => {
                     const product = allProducts.find(p => p.id === item.productId);
                     if (product) {
-                      const selectedUnit = product.units?.find(u => u.name === item.unit);
-                      if (selectedUnit && selectedUnit.conversionRate > 1) {
-                        const basePrice = Number(item.price || 0) / selectedUnit.conversionRate;
+                      const conv = Number(item.importConversionRate) || 1;
+                      if (conv && conv > 0) {
+                        const basePrice = Number(item.price || 0) / conv;
                         return (
                           <p className="mt-1 text-[11px] font-bold text-slate-500">
                             (= {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(basePrice)} / {product.unit || 'chai'})
@@ -335,7 +437,7 @@ const AdminStockReceiptForm = () => {
 
                 {/* Thành tiền */}
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">Thành tiền {item.unit ? `(${item.unit})` : ''}</label>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Thành tiền</label>
                   <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 h-[46px] flex items-center justify-start truncate">
                     {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(item.quantity || 0) * Number(item.price || 0))}
                   </div>
@@ -375,7 +477,7 @@ const AdminStockReceiptForm = () => {
         <div className="flex items-center gap-3">
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || !canCreateReceipt}
             className="rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {saving ? 'Đang lưu...' : 'Tạo phiếu nhập'}
@@ -388,7 +490,8 @@ const AdminStockReceiptForm = () => {
             Hủy bỏ
           </button>
         </div>
-      </form>
+        </form>
+      </fieldset>
     </div>
   );
 };

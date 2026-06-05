@@ -7,6 +7,8 @@ import orderService from '../services/orderService';
 import toast from 'react-hot-toast';
 import paymentService from '../services/Payment';
 import shippingService from '../services/shippingService';
+import geoService from '../services/geoService';
+import MapPicker from '../components/MapPicker';
 import voucherService from '../services/voucherService';
 import { Tag, X } from 'lucide-react';
 import { VoucherContext } from '../context/VoucherContext';
@@ -49,8 +51,15 @@ const Checkout = () => {
 
   const [shippingAddress, setShippingAddress] = useState('');
   const [shippingFee, setShippingFee] = useState(0);
+  const [stores, setStores] = useState([]);
+  const [selectedStoreId, setSelectedStoreId] = useState(null);
+  const [showMap, setShowMap] = useState(false);
+  const [selectedCoords, setSelectedCoords] = useState(null);
+  const [mapAddress, setMapAddress] = useState(null); // address from map pick
   const [voucherCodeInput, setVoucherCodeInput] = useState('');
   const [shippingVoucherCodeInput, setShippingVoucherCodeInput] = useState('');
+  const [autoSelectedStore, setAutoSelectedStore] = useState(false);
+  const [resolvedCoords, setResolvedCoords] = useState(null);
 
   useEffect(() => {
     if (location.state?.appliedVoucher) {
@@ -66,6 +75,7 @@ const Checkout = () => {
   const [starDiscount, setStarDiscount] = useState(0);
   const [useAllStars, setUseAllStars] = useState(false);
   const [shippingLocations, setShippingLocations] = useState([]);
+  const [preview, setPreview] = useState(null);
 
   const selectedItems = cartItems.filter((item) => item.ticked);
   const selectedSubtotal = selectedItems.reduce(
@@ -93,7 +103,7 @@ const Checkout = () => {
     const hasFullAddress = user.province && user.district && user.ward && user.houseNumber;
     if (!hasFullAddress) {
       toast.error('Vui lòng cập nhật đầy đủ thông tin địa chỉ trong hồ sơ trước khi đặt hàng!');
-      navigate('/profile?tab=info', { replace: true });
+      navigate('/profile?tab=info&from=checkout', { replace: true });
     }
   }, [user, navigate]);
 
@@ -118,27 +128,114 @@ const Checkout = () => {
 
   useEffect(() => {
     if (!user) return;
-
-    const { province, district, ward } = user;
+    const { houseNumber, ward, district, province } = user;
     if (!province || !district || !ward) return;
-    axiosClient.get('/orders/shipping-fee', {
-      params: { 
-        province, 
-        district, 
-        ward,
-        subtotal: selectedSubtotal 
+
+    const calcFee = async (lat, lng) => {
+      try {
+        const res = await shippingService.calculateFee({
+          lat, lng,
+          subtotal: selectedSubtotal,
+          storeId: selectedStoreId,
+        });
+        const fee = Number(res?.data ?? res);
+        setShippingFee(Number.isFinite(fee) ? fee : 15000);
+        setResolvedCoords(lat != null && lng != null ? [lat, lng] : null);
+      } catch {
+        setShippingFee(15000);
+        setResolvedCoords(null);
       }
-    })
-      .then((res) => {
-        const fee = Number(res?.data || res);
-        setShippingFee(Number.isFinite(fee) ? fee : 30000);
-      })
-      .catch(() => setShippingFee(30000));
-  }, [user]);
+    };
+
+    // 1. Người dùng chọn vị trí trên bản đồ → ưu tiên cao nhất
+    if (selectedCoords) {
+      calcFee(selectedCoords[0], selectedCoords[1]);
+      return;
+    }
+
+    // 2. Dùng toạ độ đã lưu trong profile (nhanh, chính xác)
+    if (user.latitude && user.longitude) {
+      calcFee(Number(user.latitude), Number(user.longitude));
+      return;
+    }
+
+    // 3. Fallback: geocode địa chỉ profile qua Nominatim
+    const geocodeAndCalc = async () => {
+      try {
+        const fullAddress = [houseNumber, ward, district, province].filter(Boolean).join(', ');
+        let res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullAddress)}&format=json&limit=1&countrycodes=vn`, { headers: { 'Accept-Language': 'vi' } });
+        let data = await res.json();
+
+        if (!data || data.length === 0) {
+          const generalAddress = [ward, district, province].filter(Boolean).join(', ');
+          res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(generalAddress)}&format=json&limit=1&countrycodes=vn`, { headers: { 'Accept-Language': 'vi' } });
+          data = await res.json();
+        }
+
+        if (data && data.length > 0) {
+          calcFee(parseFloat(data[0].lat), parseFloat(data[0].lon));
+        } else {
+          calcFee(null, null); // Không tìm thấy toạ độ → để Backend tính theo phí cơ bản
+        }
+      } catch (err) {
+        calcFee(null, null); // Geocode lỗi → để Backend tính
+      }
+    };
+
+    geocodeAndCalc();
+  }, [user, selectedCoords, selectedSubtotal, selectedStoreId]);
 
   useEffect(() => {
     if (user && selectedItems.length === 0) navigate('/cart', { replace: true });
   }, [user, selectedItems.length, navigate]);
+
+  // Detect region and load stores for user's address
+  useEffect(() => {
+    if (!user) return;
+    const address = `${user.houseNumber || ''} ${user.ward || ''} ${user.district || ''} ${user.province || ''}`.trim();
+    if (!address) return;
+    geoService.detect(address).then((res) => {
+      const data = res?.data || res;
+      const payload = data?.data || data;
+      if (payload && payload.storesList) {
+        setStores(Array.isArray(payload.storesList) ? payload.storesList.filter((store) => store?.deleted !== true) : []);
+      }
+    }).catch((e) => {
+      console.error('Geo detect failed', e);
+    });
+  }, [user]);
+
+  // Logic tự động chọn cửa hàng theo tỉnh thành và độ gần
+  useEffect(() => {
+    if (stores.length === 0 || !user) return;
+
+    const cleanProv = (user.province || '').toLowerCase().replace(/thành phố|tỉnh/g, '').trim();
+    const matchedStores = stores.filter(s => (s.address || '').toLowerCase().includes(cleanProv));
+
+    if (matchedStores.length > 0) {
+       setAutoSelectedStore(true);
+       let best = matchedStores[0];
+
+       const lat = selectedCoords ? selectedCoords[0] : (user.latitude ? Number(user.latitude) : null);
+       const lng = selectedCoords ? selectedCoords[1] : (user.longitude ? Number(user.longitude) : null);
+
+       if (matchedStores.length > 1 && lat && lng) {
+          let minD = Infinity;
+          matchedStores.forEach(s => {
+             if (s.latitude && s.longitude) {
+                const d = haversineKm(lat, lng, Number(s.latitude), Number(s.longitude));
+                if (d < minD) { minD = d; best = s; }
+             }
+          });
+       }
+       setSelectedStoreId(best.id);
+    } else {
+       setAutoSelectedStore(false);
+       if (!selectedStoreId && stores.length > 0) {
+         setSelectedStoreId(stores[0].id);
+       }
+    }
+  }, [stores, user, mapAddress, selectedCoords]);
 
   const handleApplyVoucher = async (forcedCode) => {
     const codeToApply = (typeof forcedCode === 'string') ? forcedCode : voucherCodeInput;
@@ -220,7 +317,7 @@ const Checkout = () => {
           key={v.code}
           onClick={() => ok && onSelect(v)}
           className={`relative border-2 rounded-2xl p-4 transition-all ${
-            !ok 
+            !ok
               ? 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed grayscale'
               : selected?.code === v.code
                 ? `border-${activeColor}-500 bg-${activeColor}-50 shadow-md cursor-pointer`
@@ -259,9 +356,17 @@ const Checkout = () => {
       );
     };
 
+    React.useEffect(() => {
+      const onKey = (e) => {
+        if (e.key === 'Escape') onClose();
+      };
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
+    }, [onClose]);
+
     return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-        <div className="bg-white rounded-[32px] w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+      <div onClick={(e) => { console.log('VoucherModal overlay clicked', e?.target); onClose(); }} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+        <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-[32px] w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
 
           <div className="bg-slate-950 text-white p-6 flex justify-between items-center">
             <div>
@@ -270,7 +375,7 @@ const Checkout = () => {
                 Tối đa 1 Voucher Shop & 1 Voucher Ship
               </p>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <button type="button" onClick={(e) => { e.stopPropagation(); console.log('VoucherModal close button clicked'); try { onClose(); } catch (err) { console.error('close error', err); } }} aria-label="Đóng" className="p-2 hover:bg-white/10 rounded-full transition-colors">
               <X size={24} />
             </button>
           </div>
@@ -301,7 +406,7 @@ const Checkout = () => {
 
           {/* Footer with Apply Button */}
           <div className="p-6 border-t bg-white shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
-             <button 
+             <button
                 onClick={() => onApply(tempProduct, tempShipping)}
                 className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200"
              >
@@ -359,8 +464,12 @@ const Checkout = () => {
       const maxStarsByAmount = Math.floor(maxPayableBeforeStars / 1000);
       const cappedStars = Math.min(parsedStars, user?.rewardStars || 0, maxStarsByAmount);
 
+      const defaultAddress = [user.houseNumber, user.ward, user.district, user.province].filter(Boolean).join(', ');
+      const finalAddress = mapAddress || defaultAddress;
+
       const orderRequest = {
         userId: user.id,
+        storeId: selectedStoreId,
         items: selectedItems.map((item) => ({
           productId: item.productId || item.product?.id,
           quantity: item.quantity,
@@ -369,13 +478,15 @@ const Checkout = () => {
         })),
         voucherCode: appliedVoucher ? appliedVoucher.code : null,
         shippingVoucherCode: appliedShippingVoucher ? appliedShippingVoucher.code : null,
-        shippingAddress: shippingAddress || '',
+        shippingAddress: finalAddress,
         recipientName: user?.name || '',
         recipientPhone: user?.phone || '',
         province: user.province,
         district: user.district,
         ward: user.ward,
         houseNumber: user.houseNumber,
+        latitude: resolvedCoords ? resolvedCoords[0] : null,
+        longitude: resolvedCoords ? resolvedCoords[1] : null,
         useStars: cappedStars,
       };
 
@@ -436,6 +547,70 @@ const Checkout = () => {
     }
   };
 
+  // Live preview from server to ensure checkout shows the authoritative totals
+  // Debounced server preview to avoid spamming preview endpoint when inputs change rapidly
+  useEffect(() => {
+    if (!user || selectedItems.length === 0) {
+      setPreview(null);
+      return;
+    }
+
+    const parsedStars = Number.isFinite(Number(useStarsInput))
+      ? Math.max(0, Math.floor(Number(useStarsInput)))
+      : 0;
+    const maxPayableBeforeStars = Math.max(0, selectedSubtotal - discountAmount + (shippingFee - shippingDiscountAmount));
+    const maxStarsByAmount = Math.floor(maxPayableBeforeStars / 1000);
+    const cappedStars = Math.min(parsedStars, user?.rewardStars || 0, maxStarsByAmount);
+
+    const defaultAddress = [user.houseNumber, user.ward, user.district, user.province].filter(Boolean).join(', ');
+    const finalAddress = mapAddress || defaultAddress;
+
+    const orderRequest = {
+      userId: user.id,
+      storeId: selectedStoreId,
+      items: selectedItems.map((item) => ({
+        productId: item.productId || item.product?.id,
+        quantity: item.quantity,
+        unit: item.unit,
+        conversionRate: item.conversionRate,
+      })),
+      voucherCode: appliedVoucher ? appliedVoucher.code : null,
+      shippingVoucherCode: appliedShippingVoucher ? appliedShippingVoucher.code : null,
+      shippingAddress: finalAddress,
+      recipientName: user?.name || '',
+      recipientPhone: user?.phone || '',
+      province: user.province,
+      district: user.district,
+      ward: user.ward,
+      houseNumber: user.houseNumber,
+      latitude: resolvedCoords ? resolvedCoords[0] : null,
+      longitude: resolvedCoords ? resolvedCoords[1] : null,
+      useStars: cappedStars,
+    };
+
+    let cancelled = false;
+    // debounce
+    const timer = setTimeout(() => {
+      const thisRequestId = (window.__orderPreviewReqId = (window.__orderPreviewReqId || 0) + 1);
+      (async () => {
+        try {
+          const res = await orderService.previewOrder(orderRequest);
+          const p = res?.data || res;
+          // ignore if a newer request was scheduled
+          if (cancelled) return;
+          if (window.__orderPreviewReqId !== thisRequestId) return;
+          setPreview(p);
+        } catch (err) {
+          if (cancelled) return;
+          setPreview(null);
+        }
+      })();
+    }, 300);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSubtotal, discountAmount, shippingFee, shippingDiscountAmount, appliedVoucher?.code, appliedShippingVoucher?.code, useStarsInput, resolvedCoords?.[0], resolvedCoords?.[1], selectedStoreId, user?.id, selectedItems.length]);
+
   if (!user || selectedItems.length === 0) {
     return <div className="py-20 text-center text-gray-500">Vui lòng chọn sản phẩm để thanh toán.</div>;
   }
@@ -457,7 +632,7 @@ const Checkout = () => {
 
       {showVoucherModal && (
         <VoucherModal
-          onClose={() => setShowVoucherModal(false)}
+          onClose={() => { console.log('Parent: close voucher modal requested'); setShowVoucherModal(false); }}
           productSelected={appliedVoucher}
           shippingSelected={appliedShippingVoucher}
           onApply={async (p, s) => {
@@ -477,12 +652,40 @@ const Checkout = () => {
             } else if (appliedShippingVoucher?.code !== s.code) {
               await handleApplyShippingVoucher(s.code);
             }
-            
+
             setShowVoucherModal(false);
           }}
           items={checkoutVouchers}
           subtotal={selectedSubtotal}
           selectedItems={selectedItems}
+        />
+      )}
+
+      {showMap && (
+        <MapPicker
+          initialPosition={selectedCoords || [Number(user?.latitude) || 16.0544, Number(user?.longitude) || 108.2022]}
+          storeCoords={selectedStoreId ? (() => {
+            const s = stores.find(x => x.id === selectedStoreId);
+            return s && s.latitude && s.longitude ? [Number(s.latitude), Number(s.longitude)] : null;
+          })() : null}
+          onSelect={async (coords) => {
+            setSelectedCoords(coords);
+            setShowMap(false);
+            toast.success('Đã chọn vị trí giao hàng');
+            // Reverse geocode with Nominatim
+            try {
+              const resp = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?lat=${coords[0]}&lon=${coords[1]}&format=json&accept-language=vi`,
+                { headers: { 'Accept-Language': 'vi' } }
+              );
+              const geo = await resp.json();
+              const addr = geo?.display_name || `${coords[0].toFixed(5)}, ${coords[1].toFixed(5)}`;
+              setMapAddress(addr);
+            } catch {
+              setMapAddress(`${coords[0].toFixed(5)}, ${coords[1].toFixed(5)}`);
+            }
+          }}
+          onCancel={() => setShowMap(false)}
         />
       )}
 
@@ -499,25 +702,116 @@ const Checkout = () => {
                 <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <span>📍</span> Địa Chỉ Giao Hàng
                 </h2>
+                {/* Address card */}
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex items-start gap-4">
-                  <div className="bg-brand-500 text-white p-2 rounded-lg">
+                  <div className="bg-brand-500 text-white p-2 rounded-lg flex-shrink-0">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900 text-lg">
-                      {user.houseNumber}
-                    </p>
-                    <p className="text-gray-600 mt-1">
-                      {user.ward}, {user.district}, {user.province}
-                    </p>
-                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-200">
-                      <p className="text-sm text-gray-500 font-medium">Người nhận: <span className="text-gray-900">{user.name}</span></p>
-                      <p className="text-sm text-gray-500 font-medium">SĐT: <span className="text-gray-900">{user.phone}</span></p>
-                    </div>
+                  <div className="flex-1 min-w-0">
+                    {mapAddress ? (
+                      /* ── Map-selected address ── */
+                      <>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full uppercase tracking-wide">📍 Vị trí bản đồ</span>
+                        </div>
+                        <p className="font-semibold text-gray-900 text-sm leading-snug">{mapAddress}</p>
+                        {/* Distance to selected store */}
+                        {selectedStoreId && (() => {
+                          const s = stores.find(x => x.id === selectedStoreId);
+                          if (s?.latitude && s?.longitude) {
+                            const d = haversineKm(selectedCoords[0], selectedCoords[1], Number(s.latitude), Number(s.longitude));
+                            return <p className="text-xs text-slate-500 mt-1">Cách cửa hàng <span className="font-bold text-blue-600">{d.toFixed(1)} km</span></p>;
+                          }
+                          return null;
+                        })()}
+                        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-200">
+                          <p className="text-sm text-gray-500 font-medium">Người nhận: <span className="text-gray-900">{user.name}</span></p>
+                          <p className="text-sm text-gray-500 font-medium">SĐT: <span className="text-gray-900">{user.phone}</span></p>
+                        </div>
+                      </>
+                    ) : (
+                      /* ── Default profile address ── */
+                      <>
+                        <p className="font-bold text-gray-900 text-lg">{user.houseNumber}</p>
+                        <p className="text-gray-600 mt-1">{user.ward}, {user.district}, {user.province}</p>
+                        {/* Distance to selected store from profile address */}
+                        {selectedStoreId && user.latitude && user.longitude && (() => {
+                          const s = stores.find(x => x.id === selectedStoreId);
+                          if (s?.latitude && s?.longitude) {
+                            const d = haversineKm(Number(user.latitude), Number(user.longitude), Number(s.latitude), Number(s.longitude));
+                            return <p className="text-xs text-slate-500 mt-1">Cách cửa hàng <span className="font-bold text-blue-600">{d.toFixed(1)} km</span></p>;
+                          }
+                          return null;
+                        })()}
+                        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-200">
+                          <p className="text-sm text-gray-500 font-medium">Người nhận: <span className="text-gray-900">{user.name}</span></p>
+                          <p className="text-sm text-gray-500 font-medium">SĐT: <span className="text-gray-900">{user.phone}</span></p>
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <Link to="/profile?tab=info" className="text-brand-600 font-bold text-sm hover:underline shrink-0">Thay đổi</Link>
+                  <div className="flex flex-col gap-2 shrink-0">
+                    {mapAddress ? (
+                      <button
+                        type="button"
+                        onClick={() => { setMapAddress(null); setSelectedCoords(null); }}
+                        className="text-sm text-red-500 font-bold hover:underline"
+                      >
+                        ✕ Bỏ chọn
+                      </button>
+                    ) : (
+                      <Link to="/profile?tab=info" className="text-brand-600 font-bold text-sm hover:underline">Thay đổi</Link>
+                    )}
+                    <button type="button" onClick={() => setShowMap(true)} className="text-sm text-slate-600 underline text-left">
+                      {mapAddress ? '🗺 Chọn lại' : 'Chọn vị trí trên bản đồ'}
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {/* Store selector (if stores detected) */}
+              {stores.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold mb-2">Cửa hàng lấy hàng</h3>
+                  {autoSelectedStore ? (
+                    <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-xl flex items-start gap-3">
+                      <span className="text-xl">🏪</span>
+                      <div>
+                        {(() => {
+                          const s = stores.find(x => x.id === selectedStoreId);
+                          return (
+                            <>
+                              <p className="font-bold text-sm">Được tự động chọn: {s?.name}</p>
+                              <p className="text-xs mt-1 text-blue-600/80">{s?.address}</p>
+                              {selectedCoords && selectedStoreId && s?.latitude && s?.longitude && (
+                                <p className="text-xs text-blue-600 font-semibold mt-1">
+                                  Cách vị trí giao hàng {haversineKm(selectedCoords[0], selectedCoords[1], Number(s.latitude), Number(s.longitude)).toFixed(2)} km
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <select value={selectedStoreId || ''} onChange={e => setSelectedStoreId(Number(e.target.value))} className="w-full p-3 border border-gray-200 rounded-xl bg-white shadow-sm font-medium">
+                        {stores.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}{s.address ? ` - ${s.address}` : ''}</option>
+                        ))}
+                      </select>
+                      {selectedCoords && selectedStoreId && (() => {
+                        const s = stores.find(x => x.id === selectedStoreId);
+                        if (s && s.latitude && s.longitude) {
+                          const d = haversineKm(selectedCoords[0], selectedCoords[1], Number(s.latitude), Number(s.longitude));
+                          return <p className="text-sm text-slate-500 mt-2">Cách cửa hàng khoảng <span className="font-bold">{d.toFixed(2)} km</span></p>;
+                        }
+                        return null;
+                      })()}
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Payment Method */}
               <div className="border-t pt-6">
@@ -563,11 +857,12 @@ const Checkout = () => {
               </div>
 
               {/* Reward Stars */}
-              <div className="border-t pt-6 mt-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <span>⭐</span> Tích Lũy Sao
-                </h2>
-                <div className="bg-amber-50 border border-amber-200 rounded-[24px] p-6">
+              {(user?.rewardStars || 0) > 0 && (
+                      <div className="border-t pt-6 mt-6">
+                        <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                          <span>⭐</span> Tích Lũy Sao
+                        </h2>
+                        <div className="bg-amber-50 border border-amber-200 rounded-[24px] p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-semibold text-amber-900">
@@ -577,11 +872,11 @@ const Checkout = () => {
                     </div>
                     {/* Switch Toggle Switch */}
                     <label className="relative inline-flex items-center cursor-pointer select-none">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={useAllStars}
                         onChange={(e) => handleToggleUseAllStars(e.target.checked)}
-                        className="sr-only peer" 
+                        className="sr-only peer"
                       />
                       <div className="w-11 h-6 bg-amber-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-amber-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
                       <span className="ml-3 text-sm font-bold text-amber-900">Áp dụng</span>
@@ -605,6 +900,7 @@ const Checkout = () => {
                   )}
                 </div>
               </div>
+      )}
             </form>
           </div>
 
@@ -713,8 +1009,13 @@ const Checkout = () => {
               <div className="border-t pt-4 mb-6">
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-gray-800">Tổng cộng</span>
-                  <span className="text-2xl font-bold text-red-500">{fmt.format(transferAmount)}</span>
+                  <span className="text-2xl font-bold text-red-500">{fmt.format(preview?.finalPrice ?? transferAmount)}</span>
                 </div>
+                {preview && Math.abs((preview.finalPrice || 0) - transferAmount) > 0.001 && (
+                  <div className="text-xs text-slate-500 mt-2">
+                    Lưu ý: Giá hiển thị do server xác nhận là <strong>{fmt.format(preview.finalPrice)}</strong>.
+                  </div>
+                )}
               </div>
 
               <button
@@ -736,5 +1037,14 @@ const Checkout = () => {
     </>
   );
 };
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
 
 export default Checkout;

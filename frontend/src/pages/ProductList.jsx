@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
 import ProductCard from '../components/common/ProductCard';
 import Spinner from '../components/common/Spinner';
+import { AuthContext } from '../context/AuthContext';
 import productService from '../services/productService';
 import categoryService from '../services/categoryService';
 
@@ -12,6 +13,7 @@ const ProductList = () => {
   const query = useQuery();
   const navigate = useNavigate();
   const searchKeyword = query.get('search');
+  const { user } = useContext(AuthContext);
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +30,7 @@ const ProductList = () => {
   // ================= FETCH PRODUCTS =================
   useEffect(() => {
     fetchProducts();
-  }, [category, searchKeyword, sort, filterProductIds]);
+  }, [category, searchKeyword, sort, filterProductIds, user?.storeId]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -39,6 +41,8 @@ const ProductList = () => {
         res = await productService.search({ keyword: searchKeyword });
       } else if (category) {
         res = await productService.getByCategory(category);
+      } else if (user?.storeId) {
+        res = await productService.getByStoreId(user.storeId);
       } else {
         res = await productService.getAll();
       }
@@ -48,6 +52,11 @@ const ProductList = () => {
       // Filter by product IDs if provided (Voucher specific)
       if (filterProductIds && Array.isArray(filterProductIds) && Array.isArray(data)) {
         data = data.filter(p => filterProductIds.includes(p.id));
+      }
+
+      // Ẩn các sản phẩm có tồn kho bằng 0
+      if (Array.isArray(data)) {
+        data = data.filter(p => Number(p.stock || 0) > 0);
       }
 
       // Sort price locally

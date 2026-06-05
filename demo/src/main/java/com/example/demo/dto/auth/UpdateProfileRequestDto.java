@@ -15,4 +15,7 @@ public class UpdateProfileRequestDto {
     private String ward;
     private String houseNumber;
     private String avatar;
+    private Double latitude;
+    private Double longitude;
+    private Long storeId;
 }

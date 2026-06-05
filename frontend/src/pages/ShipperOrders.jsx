@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { AuthContext } from '../context/AuthContext';
 import orderService from '../services/orderService';
@@ -43,6 +44,10 @@ const statusClass = (status) => {
 
 const ShipperOrders = () => {
   const { user } = useContext(AuthContext);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
+
   const [orders, setOrders] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -174,9 +179,20 @@ const ShipperOrders = () => {
       const response = await orderService.getShipperOrders(user.id);
       const data = response?.data || [];
       setOrders(data);
-      const nextSelected = selectedId && data.some((item) => item.id === selectedId)
-        ? selectedId
-        : data[0]?.id || null;
+      
+      const orderIdParam = query.get('orderId');
+      let nextSelected = selectedId;
+      if (orderIdParam) {
+        const found = data.find(item => String(item.id) === String(orderIdParam) || String(item.orderCode) === String(orderIdParam));
+        if (found) {
+          nextSelected = found.id;
+        }
+      }
+      if (!nextSelected) {
+        nextSelected = selectedId && data.some((item) => item.id === selectedId)
+          ? selectedId
+          : data[0]?.id || null;
+      }
       setSelectedId(nextSelected);
 
       // Fetch historical unread counts for all shipper's orders
@@ -224,6 +240,16 @@ const ShipperOrders = () => {
   useEffect(() => {
     loadDetail(selectedId);
   }, [selectedId, user?.id]);
+
+  useEffect(() => {
+    const orderIdParam = query.get('orderId');
+    if (orderIdParam && orders.length > 0) {
+      const found = orders.find(item => String(item.id) === String(orderIdParam) || String(item.orderCode) === String(orderIdParam));
+      if (found && found.id !== selectedId) {
+        setSelectedId(found.id);
+      }
+    }
+  }, [orders, query, selectedId]);
 
   const selectedOrder = useMemo(
     () => orders.find((item) => item.id === selectedId) || null,
@@ -321,7 +347,12 @@ const ShipperOrders = () => {
             {orders.map((order) => (
               <div
                 key={order.id}
-                onClick={() => setSelectedId(order.id)}
+                onClick={() => {
+                  setSelectedId(order.id);
+                  const params = new URLSearchParams(window.location.search);
+                  params.set('orderId', order.orderCode || order.id);
+                  navigate({ search: params.toString() }, { replace: true });
+                }}
                 className={`w-full rounded-xl border p-3 flex justify-between items-center transition cursor-pointer ${selectedId === order.id
                   ? 'border-blue-500 bg-blue-50/40 shadow-sm'
                   : 'border-slate-200 hover:bg-slate-50'
@@ -359,6 +390,9 @@ const ShipperOrders = () => {
                         ...prev,
                         [order.id]: 0
                       }));
+                      const params = new URLSearchParams(window.location.search);
+                      params.set('orderId', order.orderCode || order.id);
+                      navigate({ search: params.toString() }, { replace: true });
                     }}
                     className={`relative p-2.5 rounded-full transition-all border shadow-sm ${
                       unreadCountsByOrder[order.id] > 0

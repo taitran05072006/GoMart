@@ -20,7 +20,7 @@ const ProductCard = ({ product }) => {
 
   return (
     <>
-      
+
       <div className="group relative flex flex-col bg-white rounded-[32px] border border-slate-100/50 overflow-hidden transition-all duration-700 hover:-translate-y-3 hover:shadow-[0_40px_70px_rgba(0,0,0,0.1)]">
         {/* Visual Top: Image + Overlays */}
         <Link
@@ -36,7 +36,7 @@ const ProductCard = ({ product }) => {
 
           {/* Luxury Overlays */}
           <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-          
+
           {/* Floating Badges */}
           <div className="absolute top-6 left-6 flex flex-col gap-2.5">
             <div className="bg-rose-500 text-white text-[8px] font-black px-2.5 py-1.5 rounded-xl shadow-2xl shadow-rose-500/30 uppercase tracking-[0.2em] backdrop-blur-md">Mall</div>
@@ -84,10 +84,10 @@ const ProductCard = ({ product }) => {
                       const r = product.rating && product.rating > 0 ? product.rating : 5.0;
                       const isFilled = star <= Math.round(r);
                       return (
-                        <Star 
-                          key={star} 
-                          size={9} 
-                          className={isFilled ? "fill-amber-400 text-amber-400" : "text-slate-200"} 
+                        <Star
+                          key={star}
+                          size={9}
+                          className={isFilled ? "fill-amber-400 text-amber-400" : "text-slate-200"}
                         />
                       );
                     })}
@@ -115,10 +115,10 @@ const ProductCard = ({ product }) => {
                         <span className="text-xl font-black text-slate-900 italic tracking-tighter">
                             {formattedPrice}
                         </span>
-                        <span className="text-[9px] font-black text-slate-400 italic">/ {product.unit || 'unit'}</span>
+                        <span className="text-[9px] font-black text-slate-400 italic">/ {(product.unit || (product.units && product.units[0]?.name) || 'unit')}</span>
                     </div>
                 </div>
-                
+
                 <div className="flex flex-col items-end">
                    <div className="flex items-center gap-1.5 text-slate-900 mb-0.5">
                       <Gift size={10} className="text-rose-500" />

@@ -20,13 +20,18 @@ public class SupplierController {
     }
 
     @PostMapping
-    public ApiResponse<SupplierResponseDto> create(@RequestBody SupplierRequestDto dto) {
-        return ApiResponse.success("Nhà cung cấp đã được tạo", supplierService.create(dto));
+    public ApiResponse<SupplierResponseDto> create(
+            @RequestBody SupplierRequestDto dto,
+            @RequestHeader(value = "X-User-Id", required = false) String uid,
+            @RequestHeader(value = "X-Impersonate-Store-Id", required = false) String impersonatedStoreId) {
+        return ApiResponse.success("Nhà cung cấp đã được tạo", supplierService.create(dto, uid, impersonatedStoreId));
     }
 
     @GetMapping
-    public ApiResponse<List<SupplierResponseDto>> getAll() {
-        return ApiResponse.success("Lấy danh sách nhà cung cấp thành công", supplierService.getAll());
+    public ApiResponse<List<SupplierResponseDto>> getAll(
+            @RequestHeader(value = "X-User-Id", required = false) String uid,
+            @RequestHeader(value = "X-Impersonate-Store-Id", required = false) String impersonatedStoreId) {
+        return ApiResponse.success("Lấy danh sách nhà cung cấp thành công", supplierService.getAll(uid, impersonatedStoreId));
     }
 
     @GetMapping("/{id}")
@@ -35,8 +40,12 @@ public class SupplierController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<SupplierResponseDto> update(@PathVariable Long id, @RequestBody SupplierRequestDto dto) {
-        return ApiResponse.success("Nhà cung cấp đã được cập nhật", supplierService.update(id, dto));
+    public ApiResponse<SupplierResponseDto> update(
+            @PathVariable Long id, 
+            @RequestBody SupplierRequestDto dto,
+            @RequestHeader(value = "X-User-Id", required = false) String uid,
+            @RequestHeader(value = "X-Impersonate-Store-Id", required = false) String impersonatedStoreId) {
+        return ApiResponse.success("Nhà cung cấp đã được cập nhật", supplierService.update(id, dto, uid, impersonatedStoreId));
     }
 
     @DeleteMapping("/{id}")
