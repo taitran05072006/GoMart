@@ -97,7 +97,8 @@ public class PaymentService {
             long exactAmount = payment.getAmount().longValue();
             
             // Try to create a real PayOS payment link first
-            String payosCheckoutUrl = createPayOSPaymentLink(order.getId(), exactAmount, payment.getTransactionCode());
+            long payosOrderCode = Long.parseLong(payment.getTransactionCode());
+            String payosCheckoutUrl = createPayOSPaymentLink(payosOrderCode, exactAmount, "Thanh toan don " + order.getOrderCode());
             if (payosCheckoutUrl != null) {
                 payment.setQrCodeUrl(payosCheckoutUrl);
                 log.info("Created PayOS payment link for order {}: {}", orderId, payosCheckoutUrl);
@@ -115,12 +116,11 @@ public class PaymentService {
      * Creates a PayOS dynamic payment link via API.
      * Returns the QR code image URL or null on failure.
      */
-    private String createPayOSPaymentLink(Long orderId, long amount, String description) {
+    private String createPayOSPaymentLink(long orderCode, long amount, String description) {
         if (payoClientId == null || payoClientId.isBlank() || payoApiKey == null || payoApiKey.isBlank()) {
             return null;
         }
         try {
-            // PayOS orderCode must be a unique integer - use orderId
             // Description max 25 chars
             String desc = description.length() > 25 ? description.substring(description.length() - 25) : description;
             
@@ -128,13 +128,13 @@ public class PaymentService {
             String sigStr = "amount=" + amount
                 + "&cancelUrl=" + payoCancelUrl
                 + "&description=" + desc
-                + "&orderCode=" + orderId
+                + "&orderCode=" + orderCode
                 + "&returnUrl=" + payoReturnUrl;
             String signature = hmacSha256Hex(payoWebhookSecret.trim(), sigStr);
 
             String body = String.format(
                 "{\"orderCode\":%d,\"amount\":%d,\"description\":\"%s\",\"returnUrl\":\"%s\",\"cancelUrl\":\"%s\",\"signature\":\"%s\"}",
-                orderId, amount, desc, payoReturnUrl, payoCancelUrl, signature
+                orderCode, amount, desc, payoReturnUrl, payoCancelUrl, signature
             );
 
             java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
@@ -223,10 +223,13 @@ public class PaymentService {
             return;
         }
         try {
-            Long orderCode = payment.getOrder().getId();
+            String orderCodeStr = payment.getTransactionCode();
+            if (orderCodeStr == null || !orderCodeStr.matches("\\d+")) {
+                orderCodeStr = String.valueOf(payment.getOrder().getId());
+            }
             java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
             java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
-                .uri(java.net.URI.create("https://api-merchant.payos.vn/v2/payment-requests/" + orderCode))
+                .uri(java.net.URI.create("https://api-merchant.payos.vn/v2/payment-requests/" + orderCodeStr))
                 .header("x-client-id", payoClientId)
                 .header("x-api-key", payoApiKey)
                 .GET()
@@ -239,8 +242,8 @@ public class PaymentService {
                 if (data != null && data.has("status")) {
                     String status = data.get("status").asText();
                     if ("PAID".equalsIgnoreCase(status)) {
-                        log.info("Active sync: PayOS order {} is PAID. Updating local database...", orderCode);
-                        markPaymentAsPaid(payment, payment.getOrder(), String.valueOf(orderCode), "SYNC", "ACTIVE_POLLING");
+                        log.info("Active sync: PayOS order {} is PAID. Updating local database...", orderCodeStr);
+                        markPaymentAsPaid(payment, payment.getOrder(), orderCodeStr, "SYNC", "ACTIVE_POLLING");
                     } else if ("CANCELLED".equalsIgnoreCase(status)) {
                         payment.setStatus(PaymentStatus.FAILED);
                         payment.setFailureReason("Đã hủy trên PayOS");
@@ -658,7 +661,9 @@ public class PaymentService {
 
 
     private String generateTransactionCode(Order order) {
-        return order.getOrderCode();
+        long timestamp = System.currentTimeMillis() / 1000;
+        long orderId = order.getId() != null ? order.getId() : 0;
+        return String.valueOf(timestamp) + String.format("%04d", orderId % 10000);
     }
 
     private String buildCheckoutUrl(String transactionCode, BigDecimal amount) {
