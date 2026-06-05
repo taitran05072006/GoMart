@@ -17,7 +17,6 @@ public class InventoryAdminService {
     private final InventoryRepository inventoryRepository;
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
-    private final InventoryTransferRepository transferRepository;
     private final StockReceiptRepository stockReceiptRepository;
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
@@ -26,7 +25,6 @@ public class InventoryAdminService {
             InventoryRepository inventoryRepository,
             StoreRepository storeRepository,
             ProductRepository productRepository,
-            InventoryTransferRepository transferRepository,
             StockReceiptRepository stockReceiptRepository,
             OrderRepository orderRepository,
             UserRepository userRepository
@@ -34,7 +32,6 @@ public class InventoryAdminService {
         this.inventoryRepository = inventoryRepository;
         this.storeRepository = storeRepository;
         this.productRepository = productRepository;
-        this.transferRepository = transferRepository;
         this.stockReceiptRepository = stockReceiptRepository;
         this.orderRepository = orderRepository;
         this.userRepository = userRepository;
@@ -122,69 +119,6 @@ public class InventoryAdminService {
                 .build();
     }
 
-    @Transactional
-    public InventoryTransferResponseDto transferStock(InventoryTransferRequestDto request, Long requesterId) {
-        if (request == null) {
-            throw new BadRequestException("Thiếu dữ liệu chuyển kho");
-        }
-
-        if (request.getProductId() == null || request.getFromStoreId() == null || request.getToStoreId() == null) {
-            throw new BadRequestException("Thiếu sản phẩm hoặc cửa hàng chuyển kho");
-        }
-        if (request.getQuantity() == null || request.getQuantity() <= 0) {
-            throw new BadRequestException("Số lượng chuyển phải lớn hơn 0");
-        }
-        if (Objects.equals(request.getFromStoreId(), request.getToStoreId())) {
-            throw new BadRequestException("Cửa hàng nguồn và đích phải khác nhau");
-        }
-
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm"));
-        Store fromStore = storeRepository.findById(request.getFromStoreId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cửa hàng nguồn"));
-        Store toStore = storeRepository.findById(request.getToStoreId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cửa hàng đích"));
-
-        Inventory fromInventory = inventoryRepository.findByStoreIdAndProductId(fromStore.getId(), product.getId());
-        if (fromInventory == null || (fromInventory.getQuantity() == null ? 0 : fromInventory.getQuantity()) < request.getQuantity()) {
-            throw new BadRequestException("Kho nguồn không đủ tồn kho");
-        }
-
-        Inventory toInventory = inventoryRepository.findByStoreIdAndProductId(toStore.getId(), product.getId());
-        int sourceQty = fromInventory.getQuantity() != null ? fromInventory.getQuantity() : 0;
-        int targetQty = toInventory != null && toInventory.getQuantity() != null ? toInventory.getQuantity() : 0;
-
-        fromInventory.setQuantity(sourceQty - request.getQuantity());
-        inventoryRepository.save(fromInventory);
-
-        if (toInventory == null) {
-            toInventory = Inventory.builder()
-                    .store(toStore)
-                    .product(product)
-                    .quantity(targetQty + request.getQuantity())
-                    .sellingPrice(fromInventory.getSellingPrice() != null ? fromInventory.getSellingPrice() : product.getPrice())
-                    .build();
-        } else {
-            toInventory.setQuantity(targetQty + request.getQuantity());
-            if (toInventory.getSellingPrice() == null) {
-                toInventory.setSellingPrice(fromInventory.getSellingPrice() != null ? fromInventory.getSellingPrice() : product.getPrice());
-            }
-        }
-        inventoryRepository.save(toInventory);
-
-        User requester = requesterId != null ? userRepository.findById(requesterId).orElse(null) : null;
-        InventoryTransfer transfer = InventoryTransfer.builder()
-                .product(product)
-                .fromStore(fromStore)
-                .toStore(toStore)
-                .quantity(request.getQuantity())
-                .note(request.getNote())
-                .createdBy(requester)
-                .build();
-
-        InventoryTransfer saved = transferRepository.save(transfer);
-        return toTransferDto(saved);
-    }
 
     @Transactional(readOnly = true)
     public List<InventoryHistoryResponseDto> getHistory(Long storeId) {
@@ -235,23 +169,7 @@ public class InventoryAdminService {
                     }
                 });
 
-        transferRepository.findAllByOrderByCreatedAtDesc().stream()
-                .filter(transfer -> storeId == null
-                        || (transfer.getFromStore() != null && Objects.equals(transfer.getFromStore().getId(), storeId))
-                        || (transfer.getToStore() != null && Objects.equals(transfer.getToStore().getId(), storeId)))
-                .forEach(transfer -> result.add(InventoryHistoryResponseDto.builder()
-                        .id(transfer.getId())
-                        .type("TRANSFER")
-                        .createdAt(transfer.getCreatedAt())
-                        .productId(transfer.getProduct() != null ? transfer.getProduct().getId() : null)
-                        .productName(transfer.getProduct() != null ? transfer.getProduct().getName() : null)
-                        .quantity(transfer.getQuantity())
-                        .fromStoreId(transfer.getFromStore() != null ? transfer.getFromStore().getId() : null)
-                        .fromStoreName(transfer.getFromStore() != null ? transfer.getFromStore().getName() : null)
-                        .toStoreId(transfer.getToStore() != null ? transfer.getToStore().getId() : null)
-                        .toStoreName(transfer.getToStore() != null ? transfer.getToStore().getName() : null)
-                        .note(transfer.getNote())
-                        .build()));
+
 
         result.sort((a, b) -> {
             LocalDateTime left = a.getCreatedAt() != null ? a.getCreatedAt() : LocalDateTime.MIN;
@@ -262,20 +180,5 @@ public class InventoryAdminService {
         return result;
     }
 
-    private InventoryTransferResponseDto toTransferDto(InventoryTransfer transfer) {
-        return InventoryTransferResponseDto.builder()
-                .id(transfer.getId())
-                .createdAt(transfer.getCreatedAt())
-                .productId(transfer.getProduct() != null ? transfer.getProduct().getId() : null)
-                .productName(transfer.getProduct() != null ? transfer.getProduct().getName() : null)
-                .quantity(transfer.getQuantity())
-                .fromStoreId(transfer.getFromStore() != null ? transfer.getFromStore().getId() : null)
-                .fromStoreName(transfer.getFromStore() != null ? transfer.getFromStore().getName() : null)
-                .toStoreId(transfer.getToStore() != null ? transfer.getToStore().getId() : null)
-                .toStoreName(transfer.getToStore() != null ? transfer.getToStore().getName() : null)
-                .createdByUserId(transfer.getCreatedBy() != null ? transfer.getCreatedBy().getId() : null)
-                .createdByUserName(transfer.getCreatedBy() != null ? transfer.getCreatedBy().getName() : null)
-                .note(transfer.getNote())
-                .build();
-    }
+
 }

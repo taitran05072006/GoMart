@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { ArrowRightLeft, CalendarDays, RefreshCw, Store, Warehouse } from 'lucide-react';
+import { CalendarDays, RefreshCw, Warehouse } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { AuthContext } from '../../context/AuthContext';
 import inventoryService from '../../services/inventoryService';
@@ -28,8 +28,6 @@ const AdminInventory = () => {
   const [expandedProductId, setExpandedProductId] = useState('');
   const [form, setForm] = useState({
     productId: '',
-    fromStoreId: '',
-    toStoreId: '',
     quantity: 1,
     note: '',
   });
@@ -77,21 +75,6 @@ const AdminInventory = () => {
     }
   }, [summary.products, form.productId, selectedProductId]);
 
-  useEffect(() => {
-    if (stores.length > 1 && !form.fromStoreId) {
-      setForm((current) => ({
-        ...current,
-        fromStoreId: String(stores[0].id),
-        toStoreId: String(stores[1].id),
-      }));
-    } else if (stores.length === 1 && !form.fromStoreId) {
-      setForm((current) => ({
-        ...current,
-        fromStoreId: String(stores[0].id),
-        toStoreId: String(stores[0].id),
-      }));
-    }
-  }, [stores, form.fromStoreId]);
 
   useEffect(() => {
     if (!summary.stores.length) {
@@ -192,14 +175,12 @@ const AdminInventory = () => {
   const historyLabel = (entry) => {
     if (entry.type === 'IMPORT') return 'Nhập kho';
     if (entry.type === 'EXPORT') return 'Xuất kho';
-    if (entry.type === 'TRANSFER') return 'Chuyển kho';
     return entry.type;
   };
 
   const historyBadgeClass = (type) => {
     if (type === 'IMPORT') return 'bg-emerald-100 text-emerald-700';
     if (type === 'EXPORT') return 'bg-rose-100 text-rose-700';
-    if (type === 'TRANSFER') return 'bg-blue-100 text-blue-700';
     return 'bg-slate-100 text-slate-700';
   };
 
@@ -412,7 +393,7 @@ const AdminInventory = () => {
               <div className="border-b border-slate-100 px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">Lịch sử nhập xuất</h3>
-                  <p className="text-xs text-slate-500">Dữ liệu nhập kho, bán hàng và chuyển kho</p>
+                  <p className="text-xs text-slate-500">Dữ liệu nhập kho và bán hàng</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <select
@@ -461,9 +442,7 @@ const AdminInventory = () => {
                       </div>
                       <div>
                         <p className="font-semibold text-slate-900">
-                          {entry.type === 'TRANSFER'
-                            ? `${entry.fromStoreName || '-'} → ${entry.toStoreName || '-'}`
-                            : `${entry.storeName || '-'} ${entry.type === 'IMPORT' ? 'nhập' : 'xuất'}`}
+                          {`${entry.storeName || '-'} ${entry.type === 'IMPORT' ? 'nhập' : 'xuất'}`}
                         </p>
                         <p className="text-sm text-slate-600">{entry.productName} : {entry.quantity}</p>
                         {entry.note && <p className="text-xs text-slate-400 mt-1">{entry.note}</p>}

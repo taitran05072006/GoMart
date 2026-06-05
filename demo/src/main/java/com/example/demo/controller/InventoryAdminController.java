@@ -3,8 +3,7 @@ package com.example.demo.controller;
 import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.inventory.InventoryHistoryResponseDto;
 import com.example.demo.dto.inventory.InventorySummaryResponseDto;
-import com.example.demo.dto.inventory.InventoryTransferRequestDto;
-import com.example.demo.dto.inventory.InventoryTransferResponseDto;
+
 import com.example.demo.entity.Role;
 import com.example.demo.entity.User;
 import com.example.demo.repository.UserRepository;
@@ -43,19 +42,7 @@ public class InventoryAdminController {
         return ApiResponse.success(service.getHistory(storeId));
     }
 
-    @PostMapping("/transfers")
-    public ApiResponse<InventoryTransferResponseDto> transferStock(
-            @RequestBody InventoryTransferRequestDto request,
-            @RequestHeader(value = "X-User-Id", required = false) String uid
-    ) {
-        if (!isSuperAdmin(uid)) return ApiResponse.error("Forbidden");
-        try {
-            Long requesterId = Long.parseLong(uid);
-            return ApiResponse.success(service.transferStock(request, requesterId));
-        } catch (Exception ex) {
-            return ApiResponse.error(ex.getMessage());
-        }
-    }
+
 
     private boolean isSuperAdmin(String uid) {
         if (uid == null) return false;

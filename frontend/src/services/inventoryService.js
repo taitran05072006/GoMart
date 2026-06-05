@@ -11,9 +11,7 @@ const inventoryService = {
       params: storeId ? { storeId } : {},
     });
   },
-  transfer: async (data) => {
-    return axiosClient.post('/admin/inventory/transfers', data);
-  },
+
   getStores: async () => {
     return axiosClient.get('/stores');
   },

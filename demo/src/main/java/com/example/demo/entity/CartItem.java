@@ -39,5 +39,5 @@ public class CartItem {
     private String unit;
 
     @Builder.Default
-    private Double conversionRate = 1.0;
+    private Double conversionRate = 1.0; // Tỷ lệ chuyển đổi sang đơn vị gốc (ví dụ: nếu unit là "box" và 1 box = 10 cái, thì conversionRate = 10.0)
 }
