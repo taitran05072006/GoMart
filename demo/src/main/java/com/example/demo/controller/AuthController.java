@@ -7,8 +7,6 @@ import com.example.demo.dto.user.CreateAdminAccountRequestDto;
 import com.example.demo.dto.user.ResetPasswordWithEmailRequestDto;
 import com.example.demo.dto.user.VerifyResetTokenRequestDto;
 import com.example.demo.dto.user.AdminUserResponseDto;
-import com.example.demo.dto.user.ForgotPasswordRequestDto;
-import com.example.demo.dto.user.ResetPasswordWithOtpRequestDto;
 import com.example.demo.dto.user.UpdateUserRoleRequestDto;
 import com.example.demo.service.UserService;
 import com.example.demo.repository.UserRepository;
@@ -172,24 +170,6 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/send-otp")
-    public ResponseEntity<?> sendOTP(@RequestBody ForgotPasswordRequestDto request) {
-        String otp = userService.sendOtp(request.getPhone());
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("message", "OTP sent");
-
-        if (userService.isDebugExposeOtpEnabled()) {
-            payload.put("otp", otp);
-        }
-
-        return ResponseEntity.ok(payload);
-    }
-
-    @PostMapping("/reset-password-otp")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordWithOtpRequestDto request) {
-        userService.resetPasswordByOtp(request);
-        return ResponseEntity.ok("Password updated");
-    }
 
     @PostMapping("/send-password-reset-link")
     public ResponseEntity<?> sendPasswordResetLink(@RequestBody ForgotPasswordEmailRequestDto request) {

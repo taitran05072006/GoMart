@@ -24,8 +24,7 @@ public enum OrderStatus {
     private final String displayName;
 
     private static final Map<OrderStatus, Set<OrderStatus>> TRANSITIONS = Map.ofEntries(
-        Map.entry(PENDING, EnumSet.of(PAID, CONFIRMED, CANCELLED)),
-        Map.entry(PAID, EnumSet.of(CONFIRMED, CANCELLED)),
+        Map.entry(PENDING, EnumSet.of(CONFIRMED, CANCELLED)),
         Map.entry(CONFIRMED, EnumSet.of(PACKING, CANCELLED)),
         Map.entry(PACKING, EnumSet.of(SHIPPING, CANCELLED)),
         Map.entry(SHIPPING, EnumSet.of(DELIVERED, CANCELLED, RETURN_AWAITING_ADMIN_CONFIRM)),

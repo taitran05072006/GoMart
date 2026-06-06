@@ -4,7 +4,6 @@ import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.auth.*;
 import com.example.demo.dto.user.CreateAdminAccountRequestDto;
 import com.example.demo.dto.user.AdminUserResponseDto;
-import com.example.demo.dto.user.ResetPasswordWithOtpRequestDto;
 import com.example.demo.entity.Role;
 import com.example.demo.entity.User;
 import com.example.demo.exception.EmailAlreadyExistException;
@@ -35,21 +34,13 @@ public class UserService {
     private final UserRepository repo;
     private final PasswordEncoder passwordEncoder;
     private final OtpService otpService;
-    private final SmsService smsService;
     private final MailService mailService;
     private final StoreRepository storeRepository;
     private final RegionDetectionService regionDetectionService;
 
-    @Value("${otp.allow-without-sms:true}")
-    private boolean allowOtpWithoutSms;
-
-    @Value("${otp.debug-expose:true}")
-    private boolean debugExposeOtp;
-
-    public UserService(OtpService optService, SmsService smsService, MailService mailService, UserRepository repo, PasswordEncoder passwordEncoder, StoreRepository storeRepository, RegionDetectionService regionDetectionService) {
+    public UserService(OtpService optService, MailService mailService, UserRepository repo, PasswordEncoder passwordEncoder, StoreRepository storeRepository, RegionDetectionService regionDetectionService) {
         this.repo = repo;
         this.passwordEncoder = passwordEncoder;
-        this.smsService = smsService;
         this.otpService = optService;
         this.mailService = mailService;
         this.storeRepository = storeRepository;
@@ -375,63 +366,6 @@ public class UserService {
         throw new BadRequestException("Không có quyền xem danh sách shipper");
     }
 
-    public String sendOtp(String phone) {
-        if (phone == null || phone.isBlank()) {
-            throw new BadRequestException("Vui lòng nhập số điện thoại");
-        }
-
-        User user = findUserByPhoneFlexible(phone)
-                .orElseThrow(() -> new BadRequestException("Số điện thoại chưa được đăng ký"));
-
-        String canonicalPhone = user.getPhone();
-
-        String otp = String.valueOf(new Random().nextInt(900000) + 100000);
-
-        otpService.saveOTP(canonicalPhone, otp);
-
-        try {
-            smsService.send(formatPhoneForSms(canonicalPhone), "OTP của bạn là: " + otp);
-        } catch (Exception e) {
-            log.error("Failed to send OTP to phone {}", canonicalPhone, e);
-            if (!allowOtpWithoutSms) {
-                throw new BadRequestException("Không gửi được OTP qua SMS. Vui lòng kiểm tra lại số điện thoại.");
-            }
-            log.warn("SMS failed but OTP fallback is enabled. phone={}, otp={}", canonicalPhone, otp);
-        }
-
-        return otp;
-    }
-
-    public void resetPasswordByOtp(ResetPasswordWithOtpRequestDto req) {
-
-        if (req == null || req.getPhone() == null || req.getPhone().isBlank()) {
-            throw new BadRequestException("Vui lòng nhập số điện thoại");
-        }
-
-        User user = findUserByPhoneFlexible(req.getPhone())
-                .orElseThrow(() -> new BadRequestException("Số điện thoại chưa được đăng ký"));
-
-        String canonicalPhone = user.getPhone();
-
-        boolean valid = otpService.verify(canonicalPhone, req.getOtp());
-
-        // Backward compatibility for OTPs generated before canonical phone normalization.
-        if (!valid) {
-            valid = otpService.verify(req.getPhone(), req.getOtp());
-        }
-
-        if (!valid) {
-            throw new BadRequestException("OTP không hợp lệ hoặc đã hết hạn");
-        }
-
-        user.setPassword(passwordEncoder.encode(req.getNewPassword()));
-        repo.save(user);
-
-        // xoá OTP sau khi dùng (quan trọng)
-        otpService.clear(canonicalPhone);
-        otpService.clear(req.getPhone());
-    }
-
     public Map<String, Object> sendPasswordResetLink(String email) {
         if (email == null || email.isBlank()) {
             throw new BadRequestException("Vui lòng nhập email");
@@ -485,63 +419,6 @@ public class UserService {
         repo.save(user);
 
         otpService.clear("EMAIL_" + req.getEmail().trim());
-    }
-
-    private Optional<User> findUserByPhoneFlexible(String phone) {
-        String normalized = phone.trim();
-        Set<String> candidates = new LinkedHashSet<>();
-        candidates.add(normalized);
-
-        String digitsOnly = normalized.replaceAll("\\D", "");
-        if (!digitsOnly.isBlank()) {
-            candidates.add(digitsOnly);
-
-            if (digitsOnly.startsWith("84") && digitsOnly.length() > 2) {
-                String local = "0" + digitsOnly.substring(2);
-                candidates.add(local);
-                candidates.add("+84" + digitsOnly.substring(2));
-            }
-
-            if (digitsOnly.startsWith("0") && digitsOnly.length() > 1) {
-                String intlSuffix = digitsOnly.substring(1);
-                candidates.add("+84" + intlSuffix);
-                candidates.add("84" + intlSuffix);
-            }
-
-            if (!digitsOnly.startsWith("0") && !digitsOnly.startsWith("84")) {
-                candidates.add("0" + digitsOnly);
-                candidates.add("+84" + digitsOnly);
-                candidates.add("84" + digitsOnly);
-            }
-        }
-
-        for (String candidate : candidates) {
-            if (candidate == null || candidate.isBlank()) continue;
-            Optional<User> matched = repo.findByPhone(candidate);
-            if (matched.isPresent()) {
-                return matched;
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    private String formatPhoneForSms(String phone) {
-        String normalized = phone.trim();
-        if (normalized.startsWith("+")) {
-            return normalized;
-        }
-        if (normalized.startsWith("84")) {
-            return "+" + normalized;
-        }
-        if (normalized.startsWith("0")) {
-            return "+84" + normalized.substring(1);
-        }
-        return normalized;
-    }
-
-    public boolean isDebugExposeOtpEnabled() {
-        return debugExposeOtp;
     }
 
     private Store getSafeStore(User user) {
