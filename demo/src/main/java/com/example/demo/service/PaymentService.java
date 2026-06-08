@@ -91,40 +91,33 @@ public class PaymentService {
         double finalPrice = order.getFinalPrice() != null ? order.getFinalPrice() : 0.0;
         payment.setAmount(BigDecimal.valueOf(Math.round(finalPrice)));
         payment.setStatus(PaymentStatus.UNPAID);
-        
+
         if (method == PaymentMethod.BANK_TRANSFER) {
             payment.setTransactionCode(generateTransactionCode(order));
             long exactAmount = payment.getAmount().longValue();
-            
-            // Try to create a real PayOS payment link first
+
             long payosOrderCode = Long.parseLong(payment.getTransactionCode());
             String payosCheckoutUrl = createPayOSPaymentLink(payosOrderCode, exactAmount, "Thanh toan don " + order.getOrderCode());
             if (payosCheckoutUrl != null) {
                 payment.setQrCodeUrl(payosCheckoutUrl);
-                log.info("Created PayOS payment link for order {}: {}", orderId, payosCheckoutUrl);
+                log.info("Đã tạo liên kết thanh toán PayOS cho đơn hàng {}: {}", orderId, payosCheckoutUrl);
             } else {
                 // Fallback to static VietQR
                 payment.setQrCodeUrl(buildCheckoutUrl(payment.getTransactionCode(), BigDecimal.valueOf(exactAmount)));
-                log.warn("PayOS API failed, falling back to static VietQR for order {}", orderId);
+                log.warn("PayOS API thất bại, chuyển sang sử dụng VietQR tĩnh cho đơn hàng {}: {}", orderId, payment.getQrCodeUrl());
             }
         }
 
         return mapToDto(paymentRepository.save(payment));
     }
 
-    /**
-     * Creates a PayOS dynamic payment link via API.
-     * Returns the QR code image URL or null on failure.
-     */
     private String createPayOSPaymentLink(long orderCode, long amount, String description) {
         if (payoClientId == null || payoClientId.isBlank() || payoApiKey == null || payoApiKey.isBlank()) {
             return null;
         }
         try {
-            // Description max 25 chars
             String desc = description.length() > 25 ? description.substring(description.length() - 25) : description;
-            
-            // Build signature: amount + cancelUrl + description + orderCode + returnUrl
+
             String sigStr = "amount=" + amount
                 + "&cancelUrl=" + payoCancelUrl
                 + "&description=" + desc
@@ -147,20 +140,19 @@ public class PaymentService {
                 .build();
 
             java.net.http.HttpResponse<String> resp = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
-            log.info("PayOS create link response [{}]: {}", resp.statusCode(), resp.body());
+            log.info("PayOS tạo liên kết thanh toán [{}]: {}", resp.statusCode(), resp.body());
 
             if (resp.statusCode() == 200) {
                 com.fasterxml.jackson.databind.JsonNode node = objectMapper.readTree(resp.body());
                 com.fasterxml.jackson.databind.JsonNode data = node.get("data");
                 if (data != null) {
-                    // PayOS returns raw EMV QR string in "qrCode" field - use it to generate QR image
                     String qrCode = data.has("qrCode") ? data.get("qrCode").asText() : null;
                     if (qrCode != null && !qrCode.isBlank()) {
                         String encoded = java.net.URLEncoder.encode(qrCode, StandardCharsets.UTF_8);
                         log.info("PayOS qrCode raw (first 50 chars): {}", qrCode.substring(0, Math.min(50, qrCode.length())));
                         return "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encoded;
                     }
-                    // Fallback: generate QR image from checkoutUrl
+
                     String checkoutUrl = data.has("checkoutUrl") ? data.get("checkoutUrl").asText() : null;
                     if (checkoutUrl != null && !checkoutUrl.isBlank()) {
                         String encoded = java.net.URLEncoder.encode(checkoutUrl, StandardCharsets.UTF_8);
@@ -179,7 +171,7 @@ public class PaymentService {
     public PaymentResponseDto confirmPayment(Long orderId) {
         Payment payment = paymentRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy payment cho đơn hàng này"));
-        
+
         Order order = payment.getOrder();
         markPaymentAsPaid(payment, order, payment.getTransactionCode(), "MANUAL", "ADMIN_CONFIRM");
         return mapToDto(payment);
@@ -189,7 +181,7 @@ public class PaymentService {
     public PaymentResponseDto failPayment(Long orderId, String reason) {
         Payment payment = paymentRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy payment cho đơn hàng này"));
-        
+
         payment.setStatus(PaymentStatus.FAILED);
         payment.setFailureReason(reason);
         return mapToDto(paymentRepository.save(payment));
@@ -198,23 +190,22 @@ public class PaymentService {
     public PaymentResponseDto getByOrder(Long orderId) {
         Payment payment = paymentRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy payment cho đơn hàng này"));
-        
-        // Active polling fallback for localhost (if webhook is missing)
+
         if (payment.getStatus() == PaymentStatus.UNPAID && payment.getMethod() == PaymentMethod.BANK_TRANSFER) {
             syncPaymentStatusWithPayOS(payment);
         }
-        
+
         return mapToDto(payment);
     }
 
     public String getPaymentStatus(Long orderId) {
         Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
         if (payment == null) return "NOT_FOUND";
-        
+
         if (payment.getStatus() == PaymentStatus.UNPAID && payment.getMethod() == PaymentMethod.BANK_TRANSFER) {
             syncPaymentStatusWithPayOS(payment);
         }
-        
+
         return payment.getStatus().name();
     }
 
@@ -262,10 +253,6 @@ public class PaymentService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Đổi phương thức thanh toán từ BANK_TRANSFER sang COD.
-     * Chỉ cho phép khi đơn hàng chưa thanh toán và đang ở trạng thái PENDING.
-     */
     @Transactional
     public PaymentResponseDto switchPaymentToCod(Long orderId) {
         Order order = orderRepository.findById(orderId)
@@ -274,17 +261,14 @@ public class PaymentService {
         Payment payment = paymentRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin thanh toán"));
 
-        // Chỉ cho phép đổi nếu phương thức là BANK_TRANSFER
         if (payment.getMethod() != PaymentMethod.BANK_TRANSFER) {
             throw new BadRequestException("Chỉ có thể đổi khi phương thức hiện tại là chuyển khoản ngân hàng");
         }
 
-        // Chỉ cho phép đổi nếu chưa thanh toán
         if (payment.getStatus() == PaymentStatus.PAID) {
             throw new BadRequestException("Đơn hàng đã thanh toán, không thể đổi phương thức");
         }
 
-        // Chỉ cho phép khi đơn hàng đang PENDING hoặc chưa xử lý
         if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.PAID) {
             throw new BadRequestException("Chỉ có thể đổi phương thức thanh toán khi đơn hàng đang chờ xử lý");
         }
@@ -296,7 +280,6 @@ public class PaymentService {
         payment.setTransactionCode(null);
         payment.setFailureReason(null);
 
-        // Đảm bảo order trở về trạng thái PENDING nếu đang ở PAID (do chuyển khoản tạo ra)
         if (order.getStatus() == OrderStatus.PAID) {
             order.setStatus(OrderStatus.PENDING);
             order.setPaymentStatus(PaymentStatus.UNPAID);
@@ -309,8 +292,6 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponseDto prepareTransfer(OrderRequestDto request) {
-        // Luồng thanh toán trước khi tạo đơn hàng (nếu có)
-        // Hoặc đơn giản là tạo một Payment entity tạm thời
         Payment payment = Payment.builder()
                 .amount(BigDecimal.valueOf(request.getTotalPrice()))
                 .method(PaymentMethod.BANK_TRANSFER)
@@ -318,7 +299,7 @@ public class PaymentService {
                 .orderData(serializeOrderData(request))
                 .transactionCode("PRE-" + System.currentTimeMillis())
                 .build();
-        
+
         payment.setQrCodeUrl(buildCheckoutUrl(payment.getTransactionCode(), payment.getAmount()));
         return mapToDto(paymentRepository.save(payment));
     }
@@ -348,20 +329,16 @@ public class PaymentService {
             String receivedSignature = (String) request.get("signature");
             java.util.Map<String, Object> dataMap = (java.util.Map<String, Object>) request.get("data");
 
-            // PayOS signature is calculated on the 'data' field
-            // 1. Sort keys alphabetically
             java.util.TreeMap<String, Object> sortedData = new java.util.TreeMap<>(dataMap);
-            
-            // 2. Build query string: key1=value1&key2=value2...
+
             StringBuilder dataStringBuilder = new StringBuilder();
             sortedData.forEach((key, value) -> {
-                // PayOS: "Các trường có giá trị null hoặc rỗng sẽ không được đưa vào chuỗi."
                 if (value != null && !String.valueOf(value).isBlank()) {
                     if (dataStringBuilder.length() > 0) {
                         dataStringBuilder.append("&");
                     }
                     dataStringBuilder.append(key).append("=");
-                    
+
                     if (value instanceof Number) {
                         double d = ((Number) value).doubleValue();
                         if (d == (long) d) {
@@ -374,7 +351,7 @@ public class PaymentService {
                     }
                 }
             });
-            
+
             String dataQueryString = dataStringBuilder.toString();
             String calculatedSignature = hmacSha256Hex(payoWebhookSecret != null ? payoWebhookSecret.trim() : "", dataQueryString);
 
@@ -398,7 +375,7 @@ public class PaymentService {
             // Extract orderCode from description OR explicit field
             String orderCode = null;
             String description = (dataMap.get("description") != null) ? String.valueOf(dataMap.get("description")).toUpperCase() : "";
-            
+
             // 1. Try to extract from description (most reliable for custom VietQR)
             if (description.contains("ORD")) {
                 int startIndex = description.indexOf("ORD");
@@ -497,7 +474,7 @@ public class PaymentService {
                 payment.setPaidAt(LocalDateTime.now());
                 payment.setProviderReference(String.valueOf(dataMap.get("reference")));
                 paymentRepository.save(payment);
-                
+
                 Order order = payment.getOrder();
                 if (order != null) {
                     order.setPaymentStatus(PaymentStatus.PAID);
@@ -534,11 +511,9 @@ public class PaymentService {
     public PaymentResponseDto processPayoWebhook(PayoWebhookRequestDto request) {
         PayOSWebhookData data = request.getData();
         Payment payment = resolvePaymentFromPayOSData(data);
-        
+
         if (payment == null) {
             log.warn("PayOS Webhook: Không tìm thấy giao dịch cho orderCode: {}", data.getOrderCode());
-            // Trả về một DTO trống hoặc throw exception tùy yêu cầu của bạn, 
-            // ở đây mình trả về null để tránh crash nhưng vẫn log lại.
             return null;
         }
 
@@ -550,7 +525,7 @@ public class PaymentService {
                     var orderResponse = orderService.createOrder(orderDto, orderDto.getVoucherCode());
                     Order order = orderRepository.findById(orderResponse.getId())
                             .orElseThrow(() -> new ResourceNotFoundException("Lỗi tạo đơn hàng sau thanh toán"));
-                    
+
                     payment.setOrder(order);
                     order.setPayment(payment);
                 } catch (Exception e) {
@@ -576,7 +551,7 @@ public class PaymentService {
             payment.setFailureReason(data.getDesc());
             paymentRepository.save(payment);
         }
-        
+
         return mapToDto(payment);
     }
 
@@ -598,22 +573,14 @@ public class PaymentService {
         }
 
         String dataQueryString = buildSortedQueryString(request.getData());
-        
+
         log.info("PayOS Webhook Debug:");
         log.info("- Raw Data String: '{}'", dataQueryString);
         log.info("- Received Signature: {}", request.getSignature());
 
-        // Thử với Checksum Key (Hiện tại)
         String sigChecksum = hmacSha256Hex(payoWebhookSecret, dataQueryString);
         log.info("- Try with Checksum Key: {}", sigChecksum);
         if (sigChecksum.equalsIgnoreCase(request.getSignature())) return true;
-
-        // Thử với API Key (Bạn hãy điền API Key thật vào đây nếu muốn test nhanh, hoặc mình sẽ lấy từ properties nếu có)
-        // String payoApiKey = "..."; 
-        // String sigApi = hmacSha256Hex(payoApiKey, dataQueryString);
-        // log.info("- Try with API Key: {}", sigApi);
-        // if (sigApi.equalsIgnoreCase(request.getSignature())) return true;
-
         return false;
     }
 
@@ -656,9 +623,6 @@ public class PaymentService {
         orderRepository.save(order);
         paymentRepository.save(payment);
     }
-
-    // Chuyển sang method public ở trên
-
 
     private String generateTransactionCode(Order order) {
         long timestamp = System.currentTimeMillis() / 1000;

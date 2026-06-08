@@ -31,7 +31,7 @@ export const CartProvider = ({ children }) => {
   const isUserNotFoundError = useCallback((err) => {
     const message = String(err?.message || '').toLowerCase();
     return (
-      message.includes('user not found') ||
+      message.includes('không tìm thấy người dùng') ||
       message.includes('không tìm thấy người dùng') ||
       message.includes('khong tim thay nguoi dung')
     );
@@ -126,9 +126,6 @@ export const CartProvider = ({ children }) => {
     }
   }, [user?.id, fetchCart, normalizeCartItems, isUserNotFoundError, logout]);
 
-  // =========================
-  // SELECT ONE
-  // =========================
   const selectItem = useCallback((cartItemId, checked) => {
     if (!user?.id) return;
 
@@ -151,9 +148,6 @@ export const CartProvider = ({ children }) => {
       });
   }, [user?.id, fetchCart, normalizeCartItems, isUserNotFoundError, logout]);
 
-  // =========================
-  // TOGGLE ALL (FIX CHẮC CHẮN OK)
-  // =========================
   const toggleAllTick = useCallback((checked) => {
     if (!user?.id) return;
 

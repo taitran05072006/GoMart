@@ -262,6 +262,30 @@ public class OrderController {
     }
 
     /**
+     * Khiếu nại chưa nhận được hàng
+     */
+    @PostMapping("/{id}/report-not-received")
+    public ApiResponse<OrderResponseDto> reportNotReceived(@PathVariable Long id) {
+        return ApiResponse.success(
+                "Đã gửi khiếu nại chưa nhận được hàng",
+                orderService.reportNotReceived(id)
+        );
+    }
+
+    /**
+     * Giải quyết khiếu nại (Admin)
+     */
+    @PatchMapping("/{id}/resolve-dispute")
+    public ApiResponse<OrderResponseDto> resolveDispute(
+            @PathVariable Long id,
+            @RequestParam boolean accept) {
+        return ApiResponse.success(
+                "Đã giải quyết khiếu nại",
+                orderService.resolveDispute(id, accept)
+        );
+    }
+
+    /**
      * Lấy lifecycle của order (trạng thái hiện tại + trạng thái tiếp theo có thể)
      */
     @GetMapping("/{id}/lifecycle")

@@ -10,7 +10,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/categories")
-@CrossOrigin(origins = "*") // cho phép gọi từ frontend (JS)
+@CrossOrigin(origins = "*") 
 public class CategoryController {
 
     private final CategoryService categoryService;

@@ -32,14 +32,12 @@ public class RegionDetectionService {
         if (address == null || address.isBlank()) return null;
         String normAddr = normalize(address);
         List<Region> regions = regionRepository.findAll();
-        // Prefer exact substring match of region name inside address
         for (Region r : regions) {
             if (r.getName() == null) continue;
             String rn = normalize(r.getName());
             if (rn.length() == 0) continue;
             if (normAddr.contains(rn)) return r;
         }
-        // Fallback: try token matching (words)
         String[] tokens = normAddr.split("\\s+");
         for (Region r : regions) {
             String rn = normalize(r.getName());

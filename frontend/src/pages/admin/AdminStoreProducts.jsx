@@ -181,6 +181,13 @@ const AdminStoreProducts = () => {
                           <p className="font-semibold text-slate-900">{product.name}</p>
                           <p className="text-xs text-slate-500">ID: {product.id} {activeTab === 'system' && `• Giá gốc: ${currency.format(product.price || 0)}`}</p>
                           <p className="text-xs text-slate-400">{product.category || 'Uncategorized'}</p>
+                          {(product.manufactureDate || product.expiryDate) && (
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {product.manufactureDate && <span>NSX: {new Date(product.manufactureDate).toLocaleDateString('vi-VN')}</span>}
+                              {product.manufactureDate && product.expiryDate && <span className="mx-1">•</span>}
+                              {product.expiryDate && <span>HSD: {new Date(product.expiryDate).toLocaleDateString('vi-VN')}</span>}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>

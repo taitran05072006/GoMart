@@ -30,8 +30,10 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'PACKING', label: 'Đang đóng gói' },
   { value: 'SHIPPING', label: 'Đang giao hàng' },
   { value: 'DELIVERED', label: 'Đã giao' },
+  { value: 'DELIVERY_DISPUTE', label: 'Khiếu nại chưa nhận' },
   { value: 'COMPLETED', label: 'Hoàn thành' },
   { value: 'CANCELLED', label: 'Đã hủy' },
+  { value: 'LOST', label: 'Thất lạc' },
   { value: 'RETURN_REQUESTED', label: 'Yêu cầu hoàn trả' },
   { value: 'RETURN_PICKING', label: 'Đang lấy hàng hoàn' },
   { value: 'RETURN_AWAITING_ADMIN_CONFIRM', label: 'Chờ duyệt hàng về kho' },
@@ -59,8 +61,12 @@ const badgeClass = (status) => {
     case 'RETURN_AWAITING_ADMIN_CONFIRM':
     case 'RETURNED_TO_WAREHOUSE':
       return 'bg-orange-100 text-orange-700';
+    case 'DELIVERY_DISPUTE':
+      return 'bg-rose-100 text-rose-700 border-rose-300 animate-pulse';
     case 'RETURNED':
       return 'bg-indigo-100 text-indigo-700';
+    case 'LOST':
+      return 'bg-gray-800 text-gray-200';
     default:
       return 'bg-slate-100 text-slate-700';
   }
@@ -650,6 +656,17 @@ const OrderDetailModal = ({
   const [showChatModal, setShowChatModal] = useState(autoOpenChat || false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const resolveDispute = async (accept) => {
+    if (!window.confirm(accept ? "Bạn có chắc chắn muốn CHẤP NHẬN khiếu nại và HỦY ĐƠN (Hoàn tiền) không?" : "Bạn có chắc chắn muốn TỪ CHỐI khiếu nại (Đơn đã giao)?")) return;
+    try {
+      await orderService.resolveDispute(order.id, accept);
+      toast.success(accept ? "Đã chấp nhận khiếu nại và hoàn tiền." : "Đã từ chối khiếu nại.");
+      onClose();
+    } catch (err) {
+      toast.error("Lỗi: " + (err.response?.data?.message || err.message));
+    }
+  };
+
   useEffect(() => {
     if (autoOpenChat) {
       setShowChatModal(true);
@@ -820,6 +837,23 @@ const OrderDetailModal = ({
               <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
               Luồng xử lý & Thao tác
             </h3>
+
+            {order.status === 'DELIVERY_DISPUTE' && (
+              <div className="flex gap-2 w-full justify-end bg-rose-50 p-4 rounded-xl border border-rose-100 mb-4">
+                <button
+                  onClick={() => resolveDispute(true)}
+                  className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 shadow-sm"
+                >
+                  Chấp nhận (Hoàn tiền)
+                </button>
+                <button
+                  onClick={() => resolveDispute(false)}
+                  className="px-6 py-2 bg-white text-slate-700 border border-slate-300 rounded-xl font-bold hover:bg-slate-50 shadow-sm"
+                >
+                  Từ chối (Đã giao)
+                </button>
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-3">
               {payment?.method === 'COD' && order.status === 'PENDING' && (

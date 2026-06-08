@@ -56,7 +56,6 @@ public class StockReceiptService {
             throw new RuntimeException("Vui lòng chọn cửa hàng trước khi tạo phiếu nhập");
         }
 
-        // 2. Tạo receipt
         StockReceipt receipt = StockReceipt.builder()
                 .code(dto.getCode())
                 .note(dto.getNote())
@@ -69,7 +68,6 @@ public class StockReceiptService {
         List<StockReceiptItem> items = new ArrayList<>();
         double totalPrice = 0;
 
-        // 3. Xử lý từng item
         for (StockReceiptItemRequestDto itemDto : dto.getItems()) {
 
             Product product = productRepository.findById(itemDto.getProductId())
@@ -81,7 +79,6 @@ public class StockReceiptService {
             item.setPrice(itemDto.getPrice());
             item.setManufactureDate(itemDto.getManufactureDate());
             item.setExpiryDate(itemDto.getExpiryDate());
-            // import unit info
             if (itemDto.getImportUnitTypeId() != null) {
                 ImportUnitType unitType = importUnitTypeRepository.findById(itemDto.getImportUnitTypeId()).orElse(null);
                 item.setImportUnitType(unitType);
@@ -89,9 +86,6 @@ public class StockReceiptService {
             item.setImportConversionRate(itemDto.getImportConversionRate());
 
             item.setReceipt(receipt);
-
-            // NOTE: Không cập nhật tồn kho (Product & Inventory) ở đây nữa.
-            // Sẽ thực hiện trong hàm approveReceipt().
 
             totalPrice += itemDto.getQuantity() * itemDto.getPrice();
 
@@ -152,13 +146,11 @@ public class StockReceiptService {
         }
 
         if ("APPROVED".equals(status)) {
-            // Duyệt: Cập nhật tồn kho
             for (StockReceiptItem item : receipt.getItems()) {
                 Product product = item.getProduct();
                 double conv = item.getImportConversionRate() != null ? item.getImportConversionRate() : 1.0;
                 int addedBaseUnits = (int) Math.round(item.getQuantity() * conv);
 
-                // Cập nhật bảng Inventory của cửa hàng
                 if (receipt.getStore() != null) {
                     Inventory inv = inventoryRepository.findByStoreIdAndProductId(receipt.getStore().getId(), product.getId());
                     if (inv == null) {
@@ -182,8 +174,7 @@ public class StockReceiptService {
                     }
                     inventoryRepository.save(inv);
                 }
-
-                // Cập nhật bảng Product tổng (để hiển thị global stock, optional nhưng nên giữ đồng bộ)
+                
                 int currentStock = product.getStock() != null ? product.getStock() : 0;
                 product.setOldBatchQuantity(currentStock);
                 product.setNewBatchQuantity(addedBaseUnits);

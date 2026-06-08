@@ -65,6 +65,14 @@ const orderService = {
       params: { reason }
     });
   },
+  reportNotReceived: async (id) => {
+    return axiosClient.post(`/orders/${id}/report-not-received`);
+  },
+  resolveDispute: async (id, accept) => {
+    return axiosClient.patch(`/orders/${id}/resolve-dispute`, null, {
+      params: { accept }
+    });
+  },
 };
 
 export default orderService;

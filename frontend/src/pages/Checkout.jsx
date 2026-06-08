@@ -55,7 +55,7 @@ const Checkout = () => {
   const [selectedStoreId, setSelectedStoreId] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const [selectedCoords, setSelectedCoords] = useState(null);
-  const [mapAddress, setMapAddress] = useState(null); // address from map pick
+  const [mapAddress, setMapAddress] = useState(null); 
   const [voucherCodeInput, setVoucherCodeInput] = useState('');
   const [shippingVoucherCodeInput, setShippingVoucherCodeInput] = useState('');
   const [autoSelectedStore, setAutoSelectedStore] = useState(false);

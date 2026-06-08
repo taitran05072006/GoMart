@@ -384,14 +384,14 @@ const Profile = () => {
   const handleNotReceived = async (order) => {
     if (!window.confirm("Bạn xác nhận chưa nhận được hàng? Chúng tôi sẽ gửi yêu cầu khiếu nại tới Admin để giải quyết lập tức.")) return;
     try {
-      await orderService.requestReturn(order.id, "Chưa nhận được hàng - Khiếu nại giao nhận");
+      await orderService.reportNotReceived(order.id);
       toast.success("Đã gửi khiếu nại chưa nhận được hàng thành công!");
       fetchOrders();
       // Auto open Admin chat
       setActiveChatChannel('CUSTOMER_ADMIN');
       setShowChatModal(true);
       if (selectedOrder && (selectedOrder.id === order.id || selectedOrder.orderId === order.id)) {
-        setSelectedOrder(prev => ({ ...prev, status: 'RETURN_REQUESTED' }));
+        setSelectedOrder(prev => ({ ...prev, status: 'DELIVERY_DISPUTE' }));
       }
     } catch (err) {
       toast.error("Lỗi gửi khiếu nại: " + (err.response?.data?.message || err.message));
@@ -626,6 +626,8 @@ const Profile = () => {
                       order.status === 'SHIPPED' ? 'bg-teal-50 text-teal-800 border border-teal-100' :
                       order.status === 'DELIVERED' ? 'bg-purple-50 text-purple-800 border border-purple-100' :
                       order.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' :
+                      order.status === 'DELIVERY_DISPUTE' ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-sm animate-pulse' :
+                      order.status === 'LOST' ? 'bg-gray-800 text-gray-200 border border-gray-600' :
                       order.status === 'RETURN_REQUESTED' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
                       order.status === 'RETURN_PICKING' ? 'bg-orange-50 text-orange-650 border border-orange-100/50' :
                       order.status === 'RETURNED' ? 'bg-slate-100 text-slate-700 border border-slate-200' :

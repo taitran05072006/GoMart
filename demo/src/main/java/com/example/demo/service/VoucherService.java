@@ -39,9 +39,9 @@ public class VoucherService {
 
     public Voucher getVoucherByCode(String code) {
         Voucher voucher = voucherRepository.findByCode(code)
-                .orElseThrow(() -> new ResourceNotFoundException("Ma giảm giá không tồn tại"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Mã giảm giá không tồn tại"));
         if (voucher.getIsDeleted() != null && voucher.getIsDeleted()) {
-            throw new ResourceNotFoundException("Ma giảm giá không tồn tại");
+            throw new ResourceNotFoundException("Mã giảm giá không tồn tại");
         }
         return voucher;
     }
@@ -70,7 +70,7 @@ public class VoucherService {
                 existing.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
                 existing.setRequiredTier(request.getRequiredTier() != null ? request.getRequiredTier() : "MEMBER");
                 existing.setApplicableProductIds(request.getApplicableProductIds());
-                
+
                 voucherRepository.save(existing);
                 return mapToDto(existing);
             } else {
@@ -100,7 +100,7 @@ public class VoucherService {
 
     public VoucherResponseDto update(String code, VoucherRequestDto request) {
         Voucher voucher = voucherRepository.findByCode(code)
-                .orElseThrow(() -> new ResourceNotFoundException("Ma giảm giá không tồn tại"));
+                .orElseThrow(() -> new ResourceNotFoundException("Mã giảm giá không tồn tại"));
 
         validateRequest(request);
 
@@ -129,7 +129,7 @@ public class VoucherService {
 
     public VoucherResponseDto toggleActive(String code, boolean active) {
         Voucher voucher = voucherRepository.findByCode(code)
-                .orElseThrow(() -> new ResourceNotFoundException("Ma giảm giá không tồn tại"));
+                .orElseThrow(() -> new ResourceNotFoundException("Mã giảm giá không tồn tại"));
         voucher.setIsActive(active);
         voucherRepository.save(voucher);
         return mapToDto(voucher);
@@ -137,20 +137,20 @@ public class VoucherService {
 
     public VoucherResponseDto validateVoucher(Long userId, String code, Double subtotal) {
         if (subtotal == null || subtotal < 0) {
-            throw new BadRequestException("Subtotal is invalid");
+            throw new BadRequestException("Tổng tiền đơn hàng không hợp lệ");
         }
 
         Voucher voucher = voucherRepository.findByCode(code)
-                .orElseThrow(() -> new BadRequestException("Ma giảm giá không tồn tại"));
+                .orElseThrow(() -> new BadRequestException("Mã giảm giá không tồn tại"));
 
         if (voucher.getIsActive() != null && !voucher.getIsActive()) {
-            throw new BadRequestException("Ma giảm giá hiện không khả dụng");
+            throw new BadRequestException("Mã giảm giá hiện không khả dụng");
         }
         if (voucher.getStartDate() != null && voucher.getStartDate().isAfter(LocalDateTime.now())) {
             throw new BadRequestException("Cam kết giảm giá chưa bắt đầu");
         }
         if (voucher.getEndDate() != null && voucher.getEndDate().isBefore(LocalDateTime.now())) {
-            throw new BadRequestException("Ma giảm giá đã hết hạn");
+            throw new BadRequestException("Mã giảm giá đã hết hạn");
         }
         if (voucher.getUsageLimit() != null && voucher.getUsedCount() != null
                 && voucher.getUsageLimit() <= voucher.getUsedCount()) {
@@ -277,18 +277,15 @@ public class VoucherService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
         Voucher voucher = voucherRepository.findByCode(code)
-                .orElseThrow(() -> new ResourceNotFoundException("Ma giảm giá không tồn tại"));
+                .orElseThrow(() -> new ResourceNotFoundException("Mã giảm giá không tồn tại"));
 
         if (userVoucherRepository.existsByUserAndVoucher(user, voucher)) {
             throw new BadRequestException("Bạn đã thu thập mã giảm giá này rồi");
-        }
-
-        // Validate voucher trước khi cho thu thập (giới hạn, ngày hết hạn...)
-        if (voucher.getIsActive() != null && !voucher.getIsActive()) {
-            throw new BadRequestException("Ma giảm giá hiện không khả dụng");
+            }
+        if (voucher.getIsActive() != null && !voucher.getIsActive()) {            throw new BadRequestException("Mã giảm giá hiện không khả dụng");
         }
         if (voucher.getEndDate() != null && voucher.getEndDate().isBefore(LocalDateTime.now())) {
-            throw new BadRequestException("Ma giảm giá đã hết hạn");
+            throw new BadRequestException("Mã giảm giá đã hết hạn");
         }
         if (voucher.getUsageLimit() != null && voucher.getUsedCount() >= voucher.getUsageLimit()) {
             throw new BadRequestException("Mã giảm giá đã hết lượt sử dụng");
@@ -345,7 +342,6 @@ public class VoucherService {
         Voucher voucher = voucherRepository.findByCode(code).orElse(null);
         if (voucher == null) return;
 
-        // Mark it as used for this specific user
         userVoucherRepository.findByUser(user).stream()
                 .filter(uv -> uv.getVoucher().getCode().equalsIgnoreCase(code) && !uv.isUsed())
                 .findFirst()
@@ -354,22 +350,16 @@ public class VoucherService {
                     userVoucherRepository.save(uv);
                 });
 
-        // Increment the global usage count
         if (voucher.getUsedCount() == null) voucher.setUsedCount(0);
         voucher.setUsedCount(voucher.getUsedCount() + 1);
         voucherRepository.save(voucher);
     }
 
-    /**
-     * Hoàn lại voucher cho người dùng khi hủy đơn hàng.
-     * Đặt lại trạng thái chưa sử dụng và giảm usedCount toàn cục.
-     */
     public void markVoucherAsUnused(User user, String code) {
         if (code == null || code.isBlank() || user == null) return;
         Voucher voucher = voucherRepository.findByCode(code).orElse(null);
         if (voucher == null) return;
 
-        // Đặt lại trạng thái chưa sử dụng cho người dùng này
         userVoucherRepository.findByUser(user).stream()
                 .filter(uv -> uv.getVoucher().getCode().equalsIgnoreCase(code) && uv.isUsed())
                 .findFirst()
@@ -378,7 +368,6 @@ public class VoucherService {
                     userVoucherRepository.save(uv);
                 });
 
-        // Giảm usedCount toàn cục
         if (voucher.getUsedCount() != null && voucher.getUsedCount() > 0) {
             voucher.setUsedCount(voucher.getUsedCount() - 1);
             voucherRepository.save(voucher);

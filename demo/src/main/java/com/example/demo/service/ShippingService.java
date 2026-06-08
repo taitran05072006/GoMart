@@ -35,13 +35,9 @@ public class ShippingService {
         }
 
         String normalizedAddress = address.trim().toLowerCase();
-        // Normalize input address tokens for matching
         String addr = normalizedAddress;
 
-        // Fetch all configured shipping fees and try exact matches (ignore case)
         List<ShippingFee> fees = repository.findAll();
-
-        // 1) Exact match province + district + ward
         for (ShippingFee f : fees) {
             if (f.getProvince() != null && f.getDistrict() != null && f.getWard() != null) {
                 String p = f.getProvince().trim().toLowerCase();
@@ -55,7 +51,6 @@ public class ShippingService {
             }
         }
 
-        // 2) Exact match province + district
         for (ShippingFee f : fees) {
             if (f.getProvince() != null && f.getDistrict() != null) {
                 String p = f.getProvince().trim().toLowerCase();
@@ -68,7 +63,6 @@ public class ShippingService {
             }
         }
 
-        // 3) Exact match province only
         for (ShippingFee f : fees) {
             if (f.getProvince() != null) {
                 String p = f.getProvince().trim().toLowerCase();
@@ -78,7 +72,6 @@ public class ShippingService {
             }
         }
 
-        // Default: fall back to flat 35k if shipping_fees table unused
         return 35000.0;
     }
 
@@ -94,7 +87,6 @@ public class ShippingService {
         }
 
         if (chosen == null) {
-            // find nearest store with coords
             double bestDist = Double.MAX_VALUE;
             for (Store s : storeRepository.findAll()) {
                 if (s.getLatitude() == null || s.getLongitude() == null) continue;
@@ -114,7 +106,7 @@ public class ShippingService {
         double perKm = cfg2 != null && cfg2.getPerKmRate() != null ? cfg2.getPerKmRate() : 3000.0;
         double base = cfg2 != null && cfg2.getBaseFee() != null ? cfg2.getBaseFee() : 15000.0;
         double freeKm = cfg2 != null && cfg2.getFreeKm() != null ? cfg2.getFreeKm() : 1.0;
-        // Fee = base_fee + per_km_rate * max(0, distanceKm - freeKm)
+     
         double fee = base + perKm * Math.max(0.0, distanceKm - freeKm);
         return Double.valueOf(Math.round(fee));
     }

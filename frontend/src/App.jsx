@@ -50,7 +50,6 @@ const AppShell = () => {
   const isAdminRoute = location.pathname.startsWith('/admin');
   const { user } = useContext(AuthContext);
 
-  // Lắng nghe sự kiện 401 từ axiosClient → chuyển trang bằng React Router (không reload)
   useEffect(() => {
     const handleAuthRedirect = () => {
       navigate('/login', { replace: true });

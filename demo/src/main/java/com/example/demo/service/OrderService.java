@@ -63,8 +63,6 @@ public class OrderService {
                 .shippingAddress(order.getShipping() != null ? order.getShipping().getShippingAddress() : null)
                 .shipperId(order.getAssignedShipper() != null ? order.getAssignedShipper().getId() : null)
                 .shipperName(order.getAssignedShipper() != null ? order.getAssignedShipper().getName() : null)
-                // Keep totalPrice as payable amount for backward compatibility in current
-                // frontend.
                 .totalPrice(finalPrice)
                 .subtotal(subtotal)
                 .shippingFee(shippingFee)
@@ -105,7 +103,7 @@ public class OrderService {
         return itemDtos.stream().map(itemDto -> {
 
             if (itemDto.getProductId() == null) {
-                throw new BadRequestException("ID sản phẩm là bắt buộc");
+                throw new BadRequestException("Không có sản phẩm nào được chọn");
             }
 
             if (itemDto.getQuantity() == null || itemDto.getQuantity() <= 0) {
@@ -119,12 +117,10 @@ public class OrderService {
                 throw new BadRequestException("Sản phẩm " + product.getName() + " chưa có giá");
             }
 
-            // Legacy rows may contain NULL optimistic-lock version; normalize before update.
             if (product.getVersion() == null) {
                 product.setVersion(0L);
             }
 
-            // Calculate actual quantity in base units
             double conversionRate = itemDto.getConversionRate() != null ? itemDto.getConversionRate() : 1.0;
             int quantityToDeduct = (int) (itemDto.getQuantity() * conversionRate);
 
@@ -151,7 +147,6 @@ public class OrderService {
                     inventoryRepository.save(inv);
                 }
 
-                // Đồng bộ tồn kho tổng để các màn tổng quan không bị lệch.
                 int currentGlobalStock = product.getStock() != null ? product.getStock() : 0;
                 product.setStock(Math.max(0, currentGlobalStock - quantityToDeduct));
                 productRepository.save(product);
@@ -160,17 +155,14 @@ public class OrderService {
                     throw new BadRequestException("Sản phẩm " + product.getName() + " không đủ tồn kho");
                 }
 
-                // Also decrement global product stock to keep consistency
                 if (product.getStock() == null) product.setStock(0);
                 product.setStock(Math.max(0, product.getStock() - quantityToDeduct));
                 productRepository.save(product);
             }
 
-            // Calculate base price for unit from DB (treated as Old Price)
             double enteredPrice;
             String targetUnit = itemDto.getUnit() != null ? itemDto.getUnit().trim() : "";
 
-            // Try to find matching unit in product_units
             ProductUnit matchedUnit = productUnitRepository.findByProductId(product.getId())
                     .stream()
                     .filter(u -> u.getName() != null && u.getName().equalsIgnoreCase(targetUnit))
@@ -180,12 +172,10 @@ public class OrderService {
             if (matchedUnit != null && matchedUnit.getPrice() != null) {
                 enteredPrice = matchedUnit.getPrice().doubleValue();
             } else {
-                // If not found, use base product price * conversion rate
                 enteredPrice = product.getPrice().doubleValue()
                         * (itemDto.getConversionRate() != null ? itemDto.getConversionRate() : 1.0);
             }
 
-            // Apply product discount to the entered price
             double discountPercent = product.getDiscount() != null ? product.getDiscount() : 0.0;
             double finalUnitPrice = enteredPrice * (1 - discountPercent / 100.0);
 
@@ -263,7 +253,6 @@ public class OrderService {
     }
 
     private String generateOrderCode() {
-        // Avoid collisions when multiple orders are created in the same millisecond.
         return "ORD-" + System.currentTimeMillis() + "-"
                 + java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase();
     }
@@ -276,7 +265,6 @@ public class OrderService {
         User user = userRepository.findById(dto.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("Người dùng không tồn tại"));
 
-        // Use voucher code from DTO if not provided in param
         String effectiveVoucherCode = (voucherCodeFromParam != null && !voucherCodeFromParam.isBlank())
                 ? voucherCodeFromParam
                 : dto.getVoucherCode();
@@ -288,7 +276,6 @@ public class OrderService {
                 .starsUsed(dto.getUseStars() != null ? dto.getUseStars() : 0)
                 .build();
 
-        // Associate order with a store if provided
         if (dto.getStoreId() != null) {
             Store s = storeRepository.findById(dto.getStoreId()).orElse(null);
             if (s != null) order.setStore(s);
@@ -302,7 +289,6 @@ public class OrderService {
         double subtotal = calculateSubtotal(items);
         String shippingAddress = resolveShippingAddress(dto, user);
         double shippingFee;
-        // Prefer server-side distance calculation when coordinates provided
         if (dto.getLatitude() != null && dto.getLongitude() != null) {
             Double fee = shippingService.calculateShippingFeeByCoordinates(dto.getLatitude(), dto.getLongitude(), subtotal, dto.getStoreId());
             shippingFee = fee != null ? fee : 0.0;
@@ -324,17 +310,15 @@ public class OrderService {
             voucherService.markVoucherAsUsed(user, dto.getShippingVoucherCode());
         }
 
-        // Apply Stars discount (1 star = 1000 VND)
         double starDiscount = (order.getStarsUsed() != null) ? order.getStarsUsed() * 1000.0 : 0.0;
 
-        // Guard: stars cannot exceed payable amount after vouchers (before shipping voucher).
         double payableBeforeShippingVoucher = Math.max(0.0, (subtotal + shippingFee) - (voucherDiscount + shippingDiscount));
         int maxStarsByAmount = (int) Math.floor(payableBeforeShippingVoucher / 1000.0);
         if (order.getStarsUsed() != null && order.getStarsUsed() > maxStarsByAmount) {
-            throw new BadRequestException("Số sao vượt quá giá trị đơn hàng có thể áp dụng");
+            order.setStarsUsed(maxStarsByAmount);
+            starDiscount = maxStarsByAmount * 1000.0;
         }
 
-        // Deduct stars from user
         if (order.getStarsUsed() != null && order.getStarsUsed() > 0) {
             int userStars = user.getRewardStars() != null ? user.getRewardStars() : 0;
             if (userStars < order.getStarsUsed()) {
@@ -362,7 +346,6 @@ public class OrderService {
             order.setShippingVoucher(voucherService.getVoucherByCode(dto.getShippingVoucherCode()));
         }
 
-        // Total discount includes voucher and stars
         double totalDiscount = voucherDiscount + starDiscount;
         order.setDiscount(totalDiscount);
 
@@ -447,10 +430,6 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Calculate order totals without persisting or mutating database state.
-     * Used for frontend preview so displayed amounts match server-side logic.
-     */
     public OrderResponseDto previewOrder(OrderRequestDto dto, String voucherCodeFromParam) {
         validateRequest(dto);
 
@@ -461,14 +440,12 @@ public class OrderService {
                 ? voucherCodeFromParam
                 : dto.getVoucherCode();
 
-        // Build items (read-only calculation)
         double subtotal = 0.0;
         List<OrderItem> calcItems = dto.getItems().stream().map(itemDto -> {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không tồn tại"));
 
             double conversionRate = itemDto.getConversionRate() != null ? itemDto.getConversionRate() : 1.0;
-            // Determine unit price (do not modify DB)
             ProductUnit matchedUnit = productUnitRepository.findByProductId(product.getId())
                     .stream()
                     .filter(u -> u.getName() != null && u.getName().equalsIgnoreCase(itemDto.getUnit()))
@@ -498,7 +475,6 @@ public class OrderService {
 
         subtotal = calcItems.stream().mapToDouble(OrderItem::getPrice).sum();
 
-        // Shipping fee calculation (server-side authoritative)
         double shippingFee;
         if (dto.getLatitude() != null && dto.getLongitude() != null) {
             Double fee = shippingService.calculateShippingFeeByCoordinates(dto.getLatitude(), dto.getLongitude(), subtotal, dto.getStoreId());
@@ -511,7 +487,6 @@ public class OrderService {
             shippingFee = shippingService.calculateShippingFee(shippingAddress, subtotal);
         }
 
-        // Voucher discounts (read-only validation and calc)
         double voucherDiscount = 0.0;
         if (effectiveVoucherCode != null && !effectiveVoucherCode.isBlank()) {
             voucherService.validateVoucher(dto.getUserId(), effectiveVoucherCode, subtotal);
@@ -524,7 +499,6 @@ public class OrderService {
             shippingDiscount = voucherService.calculateDiscount(dto.getUserId(), dto.getShippingVoucherCode(), shippingFee);
         }
 
-        // Stars calculation (do not mutate user's stars)
         int starsToUse = dto.getUseStars() != null ? dto.getUseStars() : 0;
         double starDiscount = starsToUse * 1000.0;
 
@@ -578,7 +552,7 @@ public class OrderService {
         orderRepository.save(order);
     }
 
-    @Transactional // khi payment sai thì order nó sẽ cập nhật lại trogn data
+    @Transactional
 
     public OrderResponseDto updateStatus(Long orderId, OrderStatus newStatus) {
         return transitionStatus(orderId, newStatus);
@@ -610,19 +584,17 @@ public class OrderService {
             throw new BadRequestException("Trạng thái mới không được để trống");
         }
 
-        // Kiểm tra xem có thể chuyển hay không (State Machine Validation)
         try {
             statusValidator.validate(order, newStatus, allowOperatorCancelInShipping);
         } catch (InvalidOrderStatusTransitionException e) {
             throw new BadRequestException(e.getMessage());
         }
 
-        log.info("Cập nhật trạng thái order {} từ {} sang {}",
+        log.info("Cập nhật trạng thái đơn hàng {} từ {} sang {}",
                 orderId, currentStatus.name(), newStatus.name());
 
         order.setStatus(newStatus);
 
-        // Xử lý các tác dụng phụ khi chuyển trạng thái
         handleStatusTransitionSideEffects(order, currentStatus, newStatus);
 
         orderRepository.save(order);
@@ -654,7 +626,7 @@ public class OrderService {
         return transitionStatus(orderId, OrderStatus.PACKING);
     }
 
-    @Transactional // gán đơn hàng cho shipper
+    @Transactional
     public OrderResponseDto assignShipper(Long orderId, Long shipperId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại"));
@@ -667,7 +639,7 @@ public class OrderService {
 
         if (order.getStatus() != OrderStatus.PACKING
                 && order.getStatus() != OrderStatus.CONFIRMED
-                && order.getStatus() != OrderStatus.SHIPPING) {
+            ) {
             throw new BadRequestException("Chỉ có thể gán shipper cho đơn đang chuẩn bị");
         }
 
@@ -757,20 +729,20 @@ public class OrderService {
         switch (newStatus) {
             case PAID:
                 order.setPaymentStatus(PaymentStatus.PAID);
-                log.info("Thanh toán thành công cho order {}", order.getOrderCode());
+                log.info("Thanh toán thành công đơn hàng {}", order.getOrderCode());
                 break;
 
             case CONFIRMED:
-                log.info("Xác nhận order {}", order.getOrderCode());
+                log.info("Xác nhận đơn hàng {}", order.getOrderCode());
                 break;
 
             case PACKING:
-                log.info("Bắt đầu đóng gói order {}", order.getOrderCode());
+                log.info("Bắt đầu đóng gói đơn hàng {}", order.getOrderCode());
                 break;
 
             case SHIPPING:
                 order.setEstimatedDeliveryTime(LocalDateTime.now().plusDays(3));
-                log.info("Bắt đầu giao order {}", order.getOrderCode());
+                log.info("Bắt đầu giao đơn hàng {}", order.getOrderCode());
                 break;
 
             case DELIVERED:
@@ -783,7 +755,7 @@ public class OrderService {
                     order.getPayment().setPaidAt(LocalDateTime.now());
                     order.getPayment().setFailureReason(null);
                 }
-                log.info("Giao hàng thành công order {}", order.getOrderCode());
+                log.info("Giao hàng thành công đơn hàng {}", order.getOrderCode());
                 break;
 
             case COMPLETED:
@@ -793,11 +765,9 @@ public class OrderService {
                         int currentStars = customer.getRewardStars() != null ? customer.getRewardStars() : 0;
                         customer.setRewardStars(currentStars + order.getStarsAwarded());
                         userRepository.save(customer);
-                        log.info("Đã tặng {} sao cho người dùng {}", order.getStarsAwarded(), customer.getEmail());
+                        log.info("Đã cộng {} sao cho người dùng {}", order.getStarsAwarded(), customer.getEmail());
                     }
-                    // Increase Sold Count
                     updateSoldCount(order, true);
-                    // Update Product Ratings
                     updateProductRatings(order);
                 } else {
                     log.info("Khôi phục đơn hàng {} về COMPLETED từ {}", order.getOrderCode(), currentStatus);
@@ -827,11 +797,8 @@ public class OrderService {
 
             case RETURNED:
                 order.setPaymentStatus(PaymentStatus.REFUNDED);
-                // Restock items
                 handleRestocking(order);
-                // Restore used vouchers back to user
                 restoreVoucherForUser(order);
-                // Restore stars user spent at checkout (if any)
                 if (order.getStarsUsed() != null && order.getStarsUsed() > 0) {
                     User customer = order.getUser();
                     if (customer != null) {
@@ -846,6 +813,27 @@ public class OrderService {
                 // Decrease Sold Count if it was previously COMPLETED
                 updateSoldCount(order, false);
                 log.info("Hoàn trả thành công order {}", order.getOrderCode());
+                break;
+
+            case DELIVERY_DISPUTE:
+                log.info("Ghi nhận khiếu nại chưa nhận hàng cho đơn {}", order.getOrderCode());
+                break;
+
+            case LOST:
+                order.setPaymentStatus(PaymentStatus.REFUNDED);
+                restoreVoucherForUser(order);
+                if (order.getStarsUsed() != null && order.getStarsUsed() > 0) {
+                    User customer = order.getUser();
+                    if (customer != null) {
+                        int currentStars = customer.getRewardStars() != null ? customer.getRewardStars() : 0;
+                        customer.setRewardStars(currentStars + order.getStarsUsed());
+                        userRepository.save(customer);
+                        log.info("Hoàn lại {} sao đã dùng cho người dùng {} do đơn {} thất lạc", order.getStarsUsed(), customer.getEmail(), order.getOrderCode());
+                    }
+                }
+                handleRefundInStars(order);
+                updateSoldCount(order, false); // Khách không nhận hàng thì số lượng bán không được tính
+                log.info("Đơn hàng {} bị thất lạc, đã hoàn tiền/sao nhưng KHÔNG restock", order.getOrderCode());
                 break;
 
             default:
@@ -885,14 +873,12 @@ public class OrderService {
         User user = order.getUser();
         if (user == null) return;
 
-        // Hoàn lại product voucher
         if (order.getVoucher() != null) {
             String voucherCode = order.getVoucher().getCode();
             voucherService.markVoucherAsUnused(user, voucherCode);
             log.info("Đã hoàn lại voucher {} cho người dùng {} do hủy đơn {}", voucherCode, user.getEmail(), order.getOrderCode());
         }
 
-        // Hoàn lại shipping voucher
         if (order.getShippingVoucher() != null) {
             String svCode = order.getShippingVoucher().getCode();
             voucherService.markVoucherAsUnused(user, svCode);
@@ -902,6 +888,7 @@ public class OrderService {
 
     private void handleRestocking(Order order) {
         if (order.getItems() != null) {
+            Long storeId = order.getStore() != null ? order.getStore().getId() : null;
             for (OrderItem item : order.getItems()) {
                 Product product = item.getProduct();
                 if (product != null) {
@@ -914,6 +901,15 @@ public class OrderService {
                             (product.getNewBatchQuantity() != null ? product.getNewBatchQuantity() : 0)
                                     + quantityInBaseUnit);
                     productRepository.save(product);
+
+                    if (storeId != null) {
+                        Inventory inv = inventoryRepository.findByStoreIdAndProductId(storeId, product.getId());
+                        if (inv != null) {
+                            inv.setQuantity((inv.getQuantity() != null ? inv.getQuantity() : 0) + quantityInBaseUnit);
+                            inv.setNewBatchQuantity((inv.getNewBatchQuantity() != null ? inv.getNewBatchQuantity() : 0) + quantityInBaseUnit);
+                            inventoryRepository.save(inv);
+                        }
+                    }
                 }
             }
         }
@@ -925,7 +921,6 @@ public class OrderService {
 
             User user = order.getUser();
             if (user != null) {
-                // 1 Star = 1000 VND. Refund the final price paid.
                 double finalPrice = (order.getFinalPrice() != null) ? order.getFinalPrice() : 0.0;
                 int starsToRefund = (int) (finalPrice / 1000);
 
@@ -969,7 +964,6 @@ public class OrderService {
                 int currentReviews = product.getReviews() != null ? product.getReviews() : 0;
 
                 double newRating = (currentRating * currentReviews + order.getRating()) / (currentReviews + 1);
-                // Làm tròn đến 1 chữ số thập phân (ví dụ: 4.8)
                 newRating = Math.round(newRating * 10.0) / 10.0;
 
                 product.setRating(newRating);
@@ -1011,6 +1005,41 @@ public class OrderService {
 
         order.setNotes((order.getNotes() != null ? order.getNotes() + "\n" : "") + "Lý do hoàn trả: " + reason);
         return transitionStatus(orderId, OrderStatus.RETURN_REQUESTED);
+    }
+
+    @Transactional
+    public OrderResponseDto reportNotReceived(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại"));
+
+        try {
+            statusValidator.validate(order, OrderStatus.DELIVERY_DISPUTE);
+        } catch (InvalidOrderStatusTransitionException e) {
+            throw new BadRequestException(e.getMessage());
+        }
+
+        order.setNotes((order.getNotes() != null ? order.getNotes() + "\n" : "") + "Khách hàng khiếu nại chưa nhận được hàng");
+        return transitionStatus(orderId, OrderStatus.DELIVERY_DISPUTE);
+    }
+
+    @Transactional
+    public OrderResponseDto resolveDispute(Long orderId, boolean acceptClaim) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại"));
+
+        if (order.getStatus() != OrderStatus.DELIVERY_DISPUTE) {
+            throw new BadRequestException("Chỉ có thể giải quyết khiếu nại đối với đơn đang ở trạng thái khiếu nại");
+        }
+
+        if (acceptClaim) {
+            // Hoàn tiền nhưng không restock (LOST)
+            order.setNotes((order.getNotes() != null ? order.getNotes() + "\n" : "") + "Admin đã xác nhận mất hàng. Đã hoàn tiền cho khách.");
+            return transitionStatus(orderId, OrderStatus.LOST);
+        } else {
+            // Từ chối khiếu nại
+            order.setNotes((order.getNotes() != null ? order.getNotes() + "\n" : "") + "Admin từ chối khiếu nại. Shipper đã cung cấp bằng chứng giao hàng.");
+            return transitionStatus(orderId, OrderStatus.DELIVERED);
+        }
     }
 
     @Transactional

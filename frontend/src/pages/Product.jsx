@@ -101,7 +101,6 @@ const AdminProducts = () => {
                   }).format(product.price)}
                 </td>
 
-                {/* Stock */}
                 <td className="p-4 text-center">
                   <span
                     className={`px-2 py-1 rounded text-xs font-medium ${

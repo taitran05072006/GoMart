@@ -28,7 +28,7 @@ public class MailService {
     @Value("${app.mail.from:}")
     private String mailFrom;
 
-    @Value("${app.mail.from-name:GoMart}")
+    @Value("${app.mail.from-name:TUBA MART}")
     private String mailFromName;
 
     public boolean isConfigured() {

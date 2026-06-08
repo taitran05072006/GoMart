@@ -29,7 +29,6 @@ public class CartService {
     private final ProductRepository productRepository;
     private final ProductUnitRepository productUnitRepository;
 
-    // ================= GET CART =================
     public CartResponseDto getCart(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
@@ -38,7 +37,6 @@ public class CartService {
         return mapToDto(cart);
     }
 
-    // ================= ADD TO CART =================
     public CartResponseDto addToCart(Long userId, CartItemRequestDto dto) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
@@ -48,8 +46,6 @@ public class CartService {
         Product product = productRepository.findById(dto.getProductId())
             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm"));
 
-        // Gộp theo productId + unit: cùng sản phẩm + cùng đơn vị thì cộng số lượng,
-        // khác đơn vị thì tạo item mới
         String incomingUnit = dto.getUnit() != null ? dto.getUnit().trim() : "";
         CartItem item = cart.getItems() != null ?
                 cart.getItems().stream()
@@ -79,7 +75,6 @@ public class CartService {
         return mapToDto(cart);
     }
 
-    // ================= REMOVE ITEM =================
     public CartResponseDto removeItem(Long userId, Long cartItemId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
@@ -91,7 +86,6 @@ public class CartService {
         return mapToDto(cart);
     }
 
-    // ================= CLEAR CART =================
     public void clearCart(Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
@@ -131,17 +125,16 @@ public class CartService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm trong giỏ hàng"));
 
         String targetUnit = unit != null ? unit.trim() : "";
-        
+
         // Check if there's ANOTHER item with the same product ID and same target unit
         CartItem existingItem = cart.getItems().stream()
-                .filter(i -> !i.getId().equals(cartItemId) 
+                .filter(i -> !i.getId().equals(cartItemId)
                         && i.getProduct().getId().equals(item.getProduct().getId())
                         && targetUnit.equalsIgnoreCase(i.getUnit() != null ? i.getUnit().trim() : ""))
                 .findFirst()
                 .orElse(null);
 
         if (existingItem != null) {
-            // Merge into existing item and remove current item
             existingItem.setQuantity(existingItem.getQuantity() + item.getQuantity());
             cart.getItems().remove(item);
         } else {
@@ -158,10 +151,7 @@ public class CartService {
     private CartResponseDto mapToDto(Cart cart) {
         List<CartItemResponseDto> itemss = cart.getItems() == null ? List.of() :
                 cart.getItems().stream().map(i -> {
-                // Fetch available units for this product to find the specific price for the selected unit
                 List<ProductUnitDto> availableUnits = new ArrayList<>();
-                
-                // 1. Base unit
                 availableUnits.add(ProductUnitDto.builder()
                         .name(i.getProduct().getUnit() != null ? i.getProduct().getUnit() : "Hộp")
                         .conversionRate(1.0)
@@ -169,7 +159,6 @@ public class CartService {
                         .oldPrice(i.getProduct().getOldPrice() != null ? i.getProduct().getOldPrice().doubleValue() : 0.0)
                         .build());
 
-                // 2. Extra units
                 availableUnits.addAll(productUnitRepository
                         .findByProductId(i.getProduct().getId())
                         .stream()
@@ -182,22 +171,19 @@ public class CartService {
                                 .build())
                         .toList());
 
-                // 3. Apply product discount to all units
                 double discountPercent = i.getProduct().getDiscount() != null ? i.getProduct().getDiscount() : 0.0;
                 availableUnits.forEach(u -> {
-                    // The price from DB is treated as the original price (oldPrice)
                     double originalPrice = u.getPrice() != null ? u.getPrice() : 0.0;
                     u.setOldPrice(originalPrice);
                     u.setPrice(originalPrice * (1 - discountPercent / 100.0));
                 });
 
-                // Calculate final unit price: Find match in availableUnits
                 double finalUnitPrice;
                 ProductUnitDto matchedUnit = availableUnits.stream()
                         .filter(u -> u.getName() != null && u.getName().equalsIgnoreCase(i.getUnit()))
                         .findFirst()
                         .orElse(null);
-                
+
                 if (matchedUnit != null) {
                     finalUnitPrice = matchedUnit.getPrice();
                 } else {

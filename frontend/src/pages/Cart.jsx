@@ -14,6 +14,37 @@ const formatVND = new Intl.NumberFormat("vi-VN", {
   currency: "VND",
 });
 
+const QuantityInput = ({ item, handleChangeQty }) => {
+  const [val, setVal] = React.useState(item.quantity);
+
+  React.useEffect(() => {
+    setVal(item.quantity);
+  }, [item.quantity]);
+
+  const handleBlur = () => {
+    let num = parseInt(val, 10);
+    if (isNaN(num) || num < 1) {
+      num = 1;
+      setVal(1);
+    }
+    if (num !== item.quantity) {
+      handleChangeQty(item.id, num);
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      min="1"
+      value={val}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
+      className="w-12 text-center font-bold text-slate-800 focus:outline-none appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+    />
+  );
+};
+
 const Cart = () => {
   const {
     cartItems,
@@ -250,9 +281,7 @@ const Cart = () => {
                       <Minus size={16} strokeWidth={3} />
                     </button>
 
-                    <span className="w-12 text-center font-bold text-slate-800">
-                      {item.quantity}
-                    </span>
+                    <QuantityInput item={item} handleChangeQty={handleChangeQty} />
 
                     <button
                       onClick={() =>

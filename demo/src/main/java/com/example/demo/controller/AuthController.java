@@ -57,7 +57,6 @@ public class AuthController {
 
     @GetMapping("/admin/customers")
     public ApiResponse<List<AdminUserResponseDto>> getAllCustomersForAdmin(@RequestHeader(value = "X-User-Id", required = false) String uid) {
-        // only SUPER_ADMIN allowed
         if (uid == null) return ApiResponse.error("Forbidden");
         try {
             Long id = Long.parseLong(uid);
@@ -148,12 +147,12 @@ public class AuthController {
             Long id = Long.parseLong(uid);
             User u = userRepository.findById(id).orElse(null);
             if (u == null) return ApiResponse.error("Forbidden");
-            
+
             // Allow SUPER_ADMIN to delete any user
             if (u.getRole() == Role.SUPER_ADMIN) {
                 return userService.deleteUserForAdmin(userId);
             }
-            
+
             // Allow STORE_ADMIN to delete shippers belonging to their store
             if (u.getRole() == Role.STORE_ADMIN) {
                 User targetUser = userRepository.findById(userId).orElse(null);
@@ -163,7 +162,7 @@ public class AuthController {
                     return userService.deleteUserForAdmin(userId);
                 }
             }
-            
+
             return ApiResponse.error("Forbidden");
         } catch (NumberFormatException ex) {
             return ApiResponse.error("Forbidden");

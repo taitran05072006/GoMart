@@ -178,6 +178,20 @@ const ShipperOrders = () => {
     try {
       const response = await orderService.getShipperOrders(user.id);
       const data = response?.data || [];
+      
+      // Sort: Active orders first (PACKING, SHIPPING, RETURN_REQUESTED, RETURN_PICKING), then by date descending
+      const isShipperActive = (status) => ['PACKING', 'SHIPPING', 'RETURN_REQUESTED', 'RETURN_PICKING'].includes(status);
+      data.sort((a, b) => {
+        const aActive = isShipperActive(a.status);
+        const bActive = isShipperActive(b.status);
+        if (aActive && !bActive) return -1;
+        if (!aActive && bActive) return 1;
+        
+        const dateA = new Date(a.orderDate || a.createdAt || 0).getTime();
+        const dateB = new Date(b.orderDate || b.createdAt || 0).getTime();
+        return dateB - dateA;
+      });
+
       setOrders(data);
       
       const orderIdParam = query.get('orderId');

@@ -19,7 +19,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*") // Cho phép gọi từ ReactJS localhost:3000
-                .withSockJS(); // Cung cấp fallback fallback cho trình duyệt cũ
+                .setAllowedOriginPatterns("*") 
+                .withSockJS();
     }
 }

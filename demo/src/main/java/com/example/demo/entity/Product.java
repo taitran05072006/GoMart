@@ -43,10 +43,9 @@ public class Product {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "import_unit_type_id")
     private ImportUnitType importUnitType;
-    
+
     @Column(name = "import_conversion_rate")
     private Double importConversionRate;
-
     // quan hệ category
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")

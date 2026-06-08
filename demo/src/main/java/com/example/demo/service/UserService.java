@@ -13,19 +13,13 @@ import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.exception.UserNotFoundException;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.repository.StoreRepository;
-import com.example.demo.service.RegionDetectionService;
 import com.example.demo.entity.Store;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
 
 @Service
 @Slf4j
@@ -67,6 +61,7 @@ public class UserService {
 
     public ApiResponse<AuthResponseDto> login(LoginRequestDto request){
         Optional<User> OptionUser = repo.findByEmail(request.getEmail());
+
         if(OptionUser.isEmpty()) throw new UserNotFoundException("Email không tồn tại!");
         User user = OptionUser.get();
         if(!passwordEncoder.matches(request.getPassword(), user.getPassword())) throw new InvalidPasswordException("Mật khẩu không đúng!");
@@ -78,7 +73,6 @@ public class UserService {
         User user = repo.findById(request.getUserId())
                 .orElseThrow(() -> new UserNotFoundException("User không tồn tại!"));
 
-        // update từng field nếu có
         if(request.getName() != null && !request.getName().isBlank()){
             user.setName(request.getName());
         }
@@ -111,7 +105,6 @@ public class UserService {
             user.setAvatar(request.getAvatar());
         }
 
-        // Auto-update the full address string for legacy support
         StringBuilder fullAddress = new StringBuilder();
         if (user.getHouseNumber() != null) fullAddress.append(user.getHouseNumber()).append(", ");
         if (user.getWard() != null) fullAddress.append(user.getWard()).append(", ");
@@ -131,13 +124,16 @@ public class UserService {
                 repo.save(user);
             }
         } else {
-            // After updating address, attempt to associate nearest store for the user.
             try {
                 String userAddress = user.getAddress();
                 if (userAddress != null && !userAddress.isBlank()) {
                     var stores = regionDetectionService.storesByAddress(userAddress);
+                    
+                    if (stores == null || stores.isEmpty()) {
+                        stores = storeRepository.findAll();
+                    }
+
                     if (stores != null && !stores.isEmpty()) {
-                        // If client provided coordinates, prefer nearest by distance
                         Double lat = request.getLatitude();
                         Double lng = request.getLongitude();
                         com.example.demo.entity.Store best = null;
@@ -159,8 +155,7 @@ public class UserService {
                     }
                 }
             } catch (Exception ex) {
-                // Don't fail profile update if store association fails
-                log.warn("Failed to auto-assign store for user {}: {}", user.getId(), ex.getMessage());
+                log.warn("Tự động gán cửa hàng cho người dùng thất bại {}: {}", user.getId(), ex.getMessage());
             }
         }
 
@@ -169,7 +164,7 @@ public class UserService {
 
     // Haversine distance in kilometers
     private double haversineKm(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371; // Radius of the earth in km
+        final int R = 6371;
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
         double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -182,7 +177,6 @@ public class UserService {
         User user = repo.findById(request.getUserId())
                 .orElseThrow(() -> new UserNotFoundException("User không tồn tại!"));
 
-        // check mật khẩu cũ
         if(!passwordEncoder.matches(request.getOldPassword(), user.getPassword())){
             throw new InvalidPasswordException("Mật khẩu cũ không đúng!");
         }
@@ -192,7 +186,6 @@ public class UserService {
             throw new RuntimeException("Mật khẩu mới phải >= 6 ký tự");
         }
 
-        // tránh đổi trùng mật khẩu cũ
         if(passwordEncoder.matches(request.getNewPassword(), user.getPassword())){
             throw new RuntimeException("Mật khẩu mới không được trùng mật khẩu cũ");
         }
@@ -381,7 +374,7 @@ public class UserService {
         boolean mailSent = false;
 
         if (mailService.isConfigured()) {
-            String subject = "Khôi phục mật khẩu tài khoản GoMart";
+            String subject = "Khôi phục mật khẩu tài khoản TUBA MART của bạn";
             String body = "<h3>Khôi phục mật khẩu</h3>"
                     + "<p>Chào " + user.getName() + ",</p>"
                     + "<p>Vui lòng click vào đường dẫn sau để đặt lại mật khẩu của bạn:</p>"
@@ -393,7 +386,6 @@ public class UserService {
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("message", "Processed");
         result.put("mailSent", mailSent);
-        // Fallback for local testing if SMTP not configured
         if (!mailSent) {
             result.put("resetLink", resetLink);
         }
@@ -426,7 +418,6 @@ public class UserService {
             return null;
         }
         try {
-            // Trigger initialization of the lazy loading proxy
             user.getStore().getName();
             return user.getStore();
         } catch (jakarta.persistence.EntityNotFoundException e) {

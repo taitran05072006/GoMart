@@ -121,10 +121,37 @@ public class OrderStatusTransitionValidator {
                 }
             }
 
+            case DELIVERY_DISPUTE -> {
+                if (order.getStatus() != OrderStatus.DELIVERED && order.getStatus() != OrderStatus.COMPLETED) {
+                    throw new InvalidOrderStatusTransitionException(
+                            "Chỉ khiếu nại khi đơn đã giao hoặc hoàn thành"
+                    );
+                }
+                if (order.getActualDeliveryTime() == null) {
+                    throw new InvalidOrderStatusTransitionException(
+                            "Thiếu thời gian giao hàng thực tế"
+                    );
+                }
+                long days = Duration.between(order.getActualDeliveryTime(), LocalDateTime.now()).toDays();
+                if (days > 3) {
+                    throw new InvalidOrderStatusTransitionException(
+                            "Đã quá hạn 3 ngày để khiếu nại chưa nhận hàng"
+                    );
+                }
+            }
+
             case CANCELLED -> {
-                if (order.getStatus().isFinalStatus()) {
+                if (order.getStatus().isFinalStatus() && order.getStatus() != OrderStatus.COMPLETED) {
                     throw new InvalidOrderStatusTransitionException(
                             "Không thể hủy đơn ở trạng thái cuối"
+                    );
+                }
+            }
+
+            case LOST -> {
+                if (order.getStatus() != OrderStatus.DELIVERY_DISPUTE) {
+                    throw new InvalidOrderStatusTransitionException(
+                            "Chỉ ghi nhận thất lạc từ trạng thái khiếu nại chưa nhận hàng"
                     );
                 }
             }

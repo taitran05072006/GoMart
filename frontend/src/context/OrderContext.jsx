@@ -58,7 +58,6 @@ export const OrderProvider = ({ children }) => {
       const res = await orderService.createOrder(orderData);
       const newOrder = res?.data ?? res;
 
-      // update UI
       setOrders(prev => [newOrder, ...prev]);
 
       return newOrder;
@@ -70,7 +69,6 @@ export const OrderProvider = ({ children }) => {
     }
   };
 
-  // 🔹 Update status
   const updateOrderStatus = async (orderId, status) => {
     try {
       const res = await orderService.updateOrderStatus(orderId, status);
