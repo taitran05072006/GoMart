@@ -196,9 +196,16 @@ public class UserService {
         return ApiResponse.success("Đổi mật khẩu thành công!", null);
     }
 
-    public ApiResponse<List<AdminUserResponseDto>> getAllUsersForAdmin() {
+    public ApiResponse<List<AdminUserResponseDto>> getAllUsersForAdmin(Role requesterRole, Long requesterStoreId) {
         List<AdminUserResponseDto> users = repo.findAll().stream()
                 .filter(u -> u.getRole() == Role.CUSTORMER)
+                .filter(u -> {
+                    if (requesterRole == Role.SUPER_ADMIN) return true;
+                    if (requesterRole == Role.STORE_ADMIN && requesterStoreId != null) {
+                        return u.getStore() != null && u.getStore().getId().equals(requesterStoreId);
+                    }
+                    return false;
+                })
                 .map(this::mapToAdminDto)
                 .toList();
         return ApiResponse.success(users);

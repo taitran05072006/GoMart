@@ -1,22 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useContext } from 'react';
 import categoryService from '../../services/categoryService';
+import { AuthContext } from '../../context/AuthContext';
 
 const Sidebar = ({ onCategorySelect, selectedCategory }) => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  
+  const { user } = useContext(AuthContext);
 
   useEffect(() => {
     setLoading(true);
-    categoryService.getAll()
+    categoryService.getAll(user?.storeId)
       .then(res => {
-        const data = res.data || res;
-        setCategories(data);
+        const data = res.data?.data || res.data || res;
+        setCategories(Array.isArray(data) ? data : []);
       })
       .catch(() => setError('Failed to load categories'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.storeId]);
 
   // filter category theo search
   const filteredCategories = useMemo(() => {

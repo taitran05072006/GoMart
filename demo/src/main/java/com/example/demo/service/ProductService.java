@@ -180,13 +180,13 @@ public class ProductService {
         return mapToWithGlobalStock(productRepository.findByIsDeletedFalse());
     }
 
-    public List<ProductResponseDto> getByStoreId(Long storeId) {
+    public List<ProductResponseDto> getByStoreId(Long storeId, boolean includeOutOfStock) {
         List<Product> allProducts = productRepository.findByIsDeletedFalse();
 
         List<Inventory> activeInventories = inventoryRepository.findAll().stream()
                 .filter(i -> i.getStore() != null && i.getStore().getId().equals(storeId))
                 .filter(i -> Boolean.TRUE.equals(i.getIsSelling()))
-                .filter(i -> i.getQuantity() != null && i.getQuantity() > 0)
+                .filter(i -> includeOutOfStock || (i.getQuantity() != null && i.getQuantity() > 0))
                 .collect(Collectors.toList());
 
         Map<Long, Inventory> inventoryMap = activeInventories.stream()
@@ -258,6 +258,7 @@ public class ProductService {
                     dto.setImportUnitName(inv.getImportUnitType().getName());
                 }
                 if (inv.getImportConversionRate() != null) dto.setImportConversionRate(inv.getImportConversionRate());
+                dto.setIsSelling(inv.getIsSelling());
             } else {
                 dto.setStock(0);
             }
@@ -479,14 +480,12 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm"));
 
-        // 1. Delete all referencing rows in child tables using native queries
-        productRepository.deleteProductUnitsByProductId(id);
+        // 1. Remove from carts so users cannot checkout deleted products
         productRepository.deleteCartItemsByProductId(id);
-        productRepository.deleteStockReceiptItemsByProductId(id);
-        productRepository.deleteOrderItemsByProductId(id);
 
-        // 2. Delete the product itself
-        productRepository.delete(product);
+        // 2. Soft delete the product to preserve order and stock history
+        product.setIsDeleted(true);
+        productRepository.save(product);
     }
     public List<ProductResponseDto> filterProducts(
             Long categoryId,

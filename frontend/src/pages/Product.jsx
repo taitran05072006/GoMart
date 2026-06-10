@@ -69,7 +69,7 @@ const AdminProducts = () => {
           <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
             <tr>
               <th className="p-4 text-left">Product</th>
-              <th className="p-4 text-center">Price</th>
+              <th className="p-4 text-center">Giá</th>
               <th className="p-4 text-center">Stock</th>
               <th className="p-4 text-center">Actions</th>
             </tr>

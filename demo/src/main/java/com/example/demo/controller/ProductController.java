@@ -24,8 +24,8 @@ public class ProductController {
     }
 
     @GetMapping(params = "storeId")
-    public ApiResponse<List<ProductResponseDto>> getProductsByStore(@RequestParam Long storeId) {
-        return ApiResponse.success(productService.getByStoreId(storeId));
+    public ApiResponse<List<ProductResponseDto>> getProductsByStore(@RequestParam Long storeId, @RequestParam(required = false, defaultValue = "false") boolean includeOutOfStock) {
+        return ApiResponse.success(productService.getByStoreId(storeId, includeOutOfStock));
     }
 
     @GetMapping("/{id:[0-9]+}")

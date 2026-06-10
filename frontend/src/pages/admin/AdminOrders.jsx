@@ -41,6 +41,11 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'RETURNED', label: 'Đã hoàn tiền' },
 ];
 
+const getStatusLabel = (status) => {
+  const option = STATUS_FILTER_OPTIONS.find(opt => opt.value === status);
+  return option ? option.label : status;
+};
+
 const badgeClass = (status) => {
   switch (status) {
     case 'CONFIRMED':
@@ -238,8 +243,8 @@ const AdminOrders = () => {
   const stats = useMemo(() => {
     return {
       all: orders.length,
-      pending: orders.filter(o => o.status === 'PENDING').length,
-      processing: orders.filter(o => ['PAID', 'CONFIRMED', 'PACKING'].includes(o.status)).length,
+      pending: orders.filter(o => ['PENDING', 'PAID'].includes(o.status)).length,
+      processing: orders.filter(o => ['CONFIRMED', 'PACKING'].includes(o.status)).length,
       shipping: orders.filter(o => o.status === 'SHIPPING').length,
       delivered: orders.filter(o => o.status === 'DELIVERED' || o.status === 'COMPLETED').length,
       cancelled: orders.filter(o => o.status === 'CANCELLED').length,
@@ -258,9 +263,11 @@ const AdminOrders = () => {
       let statusMatched = false;
       if (selectedStatus === 'ALL') {
         statusMatched = true;
+      } else if (selectedStatus === 'PENDING') {
+        statusMatched = ['PENDING', 'PAID'].includes(order.status);
       } else if (selectedStatus === 'ACTIVE') {
         // Đang xử lý: Những đơn đã qua bước Pending nhưng chưa giao xong
-        const processingStatuses = ['PAID', 'CONFIRMED', 'PACKING'];
+        const processingStatuses = ['CONFIRMED', 'PACKING'];
         statusMatched = processingStatuses.includes(order.status);
       } else {
         statusMatched = order.status === selectedStatus;
@@ -306,7 +313,6 @@ const AdminOrders = () => {
     try {
       const response = await orderService.updateStatus(orderId, status);
       const updatedOrder = response?.data?.data || response?.data || response;
-      toast.success(`Đơn hàng chuyển sang ${status}`);
       setSelectedOrder(updatedOrder); // Cập nhật ngay cho Modal
       loadOrders();
     } catch (error) {
@@ -319,7 +325,6 @@ const AdminOrders = () => {
     try {
       const response = await orderService.confirmCodOrder(orderId);
       const updatedOrder = response?.data?.data || response?.data || response;
-      toast.success('Đơn COD đã duyệt và chuyển sang PACKING');
       setSelectedOrder(updatedOrder); // Cập nhật ngay cho Modal
       loadOrders();
     } catch (error) {
@@ -337,7 +342,6 @@ const AdminOrders = () => {
     try {
       const response = await orderService.assignShipper(orderId, sId);
       const updatedOrder = response?.data?.data || response?.data || response;
-      toast.success('Đã gán shipper cho đơn hàng');
       setSelectedOrder(updatedOrder); // Cập nhật ngay cho Modal
       loadOrders();
     } catch (error) {
@@ -351,7 +355,6 @@ const AdminOrders = () => {
     if (reason === null) return;
     try {
       await paymentService.updateCancelPayment(orderId, reason);
-      toast.success('Đã hủy thanh toán');
       // Tải lại để cập nhật cả order và payment map
       await loadOrders();
       // Sau khi loadOrders, ta cần tìm lại order trong danh sách mới để cập nhật selectedOrder
@@ -367,7 +370,6 @@ const AdminOrders = () => {
   const recreateTransferPayment = async (orderId) => {
     try {
       await paymentService.createPayment(orderId, { method: 'BANK_TRANSFER' });
-      toast.success('Đã tạo lại phiên thanh toán chuyển khoản');
       await loadOrders();
       const resp = await orderService.getOrderById(orderId);
       setSelectedOrder(resp?.data?.data || resp?.data || resp);
@@ -482,7 +484,7 @@ const AdminOrders = () => {
                 return (
                   <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
-                      <span 
+                      <span
                         onClick={() => {
                           setSelectedOrder(order);
                           setAutoOpenChat(false);
@@ -525,7 +527,7 @@ const AdminOrders = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${badgeClass(order.status)}`}>
-                        {order.status}
+                        {getStatusLabel(order.status)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -571,9 +573,6 @@ const AdminOrders = () => {
                           title="Xem chi tiết"
                         >
                           <Eye size={18} />
-                        </button>
-                        <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
-                          <MoreVertical size={18} />
                         </button>
                       </div>
                     </td>
@@ -660,7 +659,6 @@ const OrderDetailModal = ({
     if (!window.confirm(accept ? "Bạn có chắc chắn muốn CHẤP NHẬN khiếu nại và HỦY ĐƠN (Hoàn tiền) không?" : "Bạn có chắc chắn muốn TỪ CHỐI khiếu nại (Đơn đã giao)?")) return;
     try {
       await orderService.resolveDispute(order.id, accept);
-      toast.success(accept ? "Đã chấp nhận khiếu nại và hoàn tiền." : "Đã từ chối khiếu nại.");
       onClose();
     } catch (err) {
       toast.error("Lỗi: " + (err.response?.data?.message || err.message));
@@ -736,7 +734,7 @@ const OrderDetailModal = ({
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-black text-slate-900">Chi tiết đơn hàng #{order.orderCode || order.id}</h2>
               <span className={`rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${badgeClass(order.status)}`}>
-                {order.status}
+                {getStatusLabel(order.status)}
               </span>
             </div>
             <p className="text-sm text-slate-500 mt-1">Đặt lúc {new Date(order.orderDate || order.createdAt).toLocaleString()}</p>
@@ -938,7 +936,6 @@ const OrderDetailModal = ({
                       const reason = window.prompt("Nhập lý do từ chối nhận hàng hoàn (ví dụ: hàng trả không đúng):");
                       if (reason) {
                         onUpdateStatus(order.id, 'COMPLETED');
-                        toast.success("Đã từ chối nhận hàng hoàn. Đơn hàng khôi phục về trạng thái Hoàn thành.");
                       }
                     }}
                     className="rounded-xl border border-rose-500 bg-white text-rose-500 px-6 py-2.5 text-sm font-bold hover:bg-rose-50 transition-all duration-300 shadow-sm"

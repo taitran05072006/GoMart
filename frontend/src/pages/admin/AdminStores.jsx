@@ -111,9 +111,9 @@ const AdminStores = () => {
       const geo = await resp.json();
       const addr = geo?.display_name || '';
       if (addr) setStoreForm(p => ({ ...p, address: addr }));
-      toast.success('Đã chọn vị trí & tự điền địa chỉ');
+
     } catch {
-      toast.success('Đã chọn toạ độ');
+
     }
   };
 
@@ -135,10 +135,10 @@ const AdminStores = () => {
     try {
       if (editingStore) {
         await axiosClient.put(`/stores/${editingStore.id}`, payload, { headers });
-        toast.success('Cập nhật cửa hàng thành công');
+
       } else {
         await axiosClient.post('/stores', payload, { headers });
-        toast.success('Thêm cửa hàng thành công');
+
       }
       setShowStoreModal(false);
       fetchAll();
@@ -155,7 +155,7 @@ const AdminStores = () => {
       await axiosClient.delete(`/stores/${store.id}`, {
         headers: uid ? { 'X-User-Id': String(uid) } : {},
       });
-      toast.success('Đã xóa cửa hàng');
+
       fetchAll();
       window.dispatchEvent(new Event('refreshStores'));
     } catch (err) {
@@ -170,7 +170,6 @@ const AdminStores = () => {
       await axiosClient.patch(`/stores/${store.id}/restore`, null, {
         headers: uid ? { 'X-User-Id': String(uid) } : {},
       });
-      toast.success('Đã khôi phục cửa hàng');
       fetchAll();
       window.dispatchEvent(new Event('refreshStores'));
     } catch (err) {
@@ -199,10 +198,10 @@ const AdminStores = () => {
     try {
       if (editingRegion) {
         await axiosClient.put(`/regions/${editingRegion.id}`, { name: regionForm.name.trim() }, { headers });
-        toast.success('Cập nhật khu vực thành công');
+
       } else {
         await axiosClient.post('/regions', { name: regionForm.name.trim() }, { headers });
-        toast.success('Thêm khu vực thành công');
+
       }
       setShowRegionModal(false);
       fetchAll();
@@ -220,18 +219,18 @@ const AdminStores = () => {
       const allStoresRes = await axiosClient.get('/stores', { params: { includeDeleted: true } });
       const allStores = allStoresRes.data?.data ?? allStoresRes.data ?? [];
       const storeCount = allStores.filter(s => s.region?.id === region.id).length;
-      
-      const confirmMsg = storeCount > 0 
+
+      const confirmMsg = storeCount > 0
         ? `Khu vực "${region.name}" đang có ${storeCount} cửa hàng.\nViệc xóa khu vực sẽ NGƯNG HOẠT ĐỘNG toàn bộ cửa hàng và nhân viên bên trong.\n\nBạn có chắc chắn muốn xóa?`
         : `Xóa khu vực "${region.name}"?`;
-        
+
       if (!window.confirm(confirmMsg)) return;
       const uid = getUserId(user);
       try {
         await axiosClient.delete(`/regions/${region.id}`, {
           headers: uid ? { 'X-User-Id': String(uid) } : {},
         });
-        toast.success('Đã xóa khu vực');
+
         fetchAll();
       } catch (err) {
         toast.error(err.response?.data?.message || 'Xóa thất bại');
@@ -247,7 +246,6 @@ const AdminStores = () => {
       await axiosClient.patch(`/regions/${region.id}/restore`, null, {
         headers: uid ? { 'X-User-Id': String(uid) } : {},
       });
-      toast.success('Đã khôi phục khu vực');
       fetchAll();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Khôi phục thất bại');

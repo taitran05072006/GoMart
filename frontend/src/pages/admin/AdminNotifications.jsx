@@ -78,7 +78,7 @@ const AdminNotifications = () => {
         senderId: user?.id,
       });
       setForm({ title: '', message: '' });
-      toast.success(user?.role === 'STORE_ADMIN' ? 'Đã gửi thông báo đến khách hàng của cửa hàng' : 'Đã gửi thông báo đến tất cả khách hàng');
+    
       loadInbox(); // Refresh inbox if broadcast also sends to admin
     } catch (error) {
       const message = error?.response?.data?.message || 'Không thể gửi thông báo lúc này';

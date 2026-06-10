@@ -52,10 +52,10 @@ const AdminImportUnits = () => {
       };
       if (editing) {
         await importUnitService.update(editing, payload);
-        toast.success('Đã cập nhật');
+
       } else {
         await importUnitService.create(payload);
-        toast.success('Đã tạo');
+
       }
       fetchAll();
     } catch (err) {
@@ -68,7 +68,7 @@ const AdminImportUnits = () => {
     if (!confirm('Xóa mục này?')) return;
     try {
       await importUnitService.remove(id);
-      toast.success('Đã xóa');
+  
       fetchAll();
     } catch (err) {
       console.error(err);

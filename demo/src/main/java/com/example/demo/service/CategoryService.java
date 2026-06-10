@@ -23,6 +23,7 @@ public class CategoryService {
         this.productRepository =productRepository;
         this.categoryRepository = categoryRepository;
     }
+    
     private CategoryResponseDto mapToDto(Category category) {
         long count = productRepository.countByCategoryIdAndIsDeletedFalse(category.getId());
         return CategoryResponseDto.builder()
@@ -50,6 +51,10 @@ public class CategoryService {
         return categoryRepository.findByIsDeletedFalse().stream().map(this::mapToDto).collect(Collectors.toList());
     }
 
+    public List<CategoryResponseDto> getByStoreId(Long storeId) {
+        return categoryRepository.findByStoreId(storeId).stream().map(this::mapToDto).collect(Collectors.toList());
+    }
+
   public CategoryResponseDto getById(Long id){
         Category category = categoryRepository.findById(id).orElseThrow(() -> new RuntimeException("Không tồn tại danh mục"));
         return mapToDto(category);
@@ -69,6 +74,12 @@ public class CategoryService {
     public void delete(Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục để xóa"));
+
+        long activeProductsCount = productRepository.countByCategoryIdAndIsDeletedFalse(id);
+        if (activeProductsCount > 0) {
+            throw new RuntimeException("Không thể xóa! Danh mục này đang chứa " + activeProductsCount + " sản phẩm.");
+        }
+
         category.setIsDeleted(true);
         categoryRepository.save(category);
     }

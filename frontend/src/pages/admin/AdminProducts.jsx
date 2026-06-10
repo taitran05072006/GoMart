@@ -46,7 +46,6 @@ const AdminProducts = () => {
     }
     try {
       await productService.delete(id);
-      toast.success('Đã xóa sản phẩm thành công');
       fetchProducts();
     } catch (err) {
       console.error(err);
@@ -131,7 +130,7 @@ const AdminProducts = () => {
                   <th className="px-6 py-4 font-black uppercase tracking-wider text-slate-500 text-xs">Sản phẩm</th>
                   <th className="px-6 py-4 font-black uppercase tracking-wider text-slate-500 text-xs">Danh mục</th>
                   <th className="px-6 py-4 font-black uppercase tracking-wider text-slate-500 text-xs text-right">Giá gốc</th>
-                  <th className="px-6 py-4 font-black uppercase tracking-wider text-slate-500 text-xs text-right">Giá khuyến mãi</th>
+                  <th className="px-6 py-4 font-black uppercase tracking-wider text-slate-500 text-xs text-right">Giá bán</th>
                   <th className="px-6 py-4 font-black uppercase tracking-wider text-slate-500 text-xs text-center">Đơn vị</th>
                   <th className="px-6 py-4 font-black uppercase tracking-wider text-slate-500 text-xs text-right">Thao tác</th>
                 </tr>
@@ -145,9 +144,9 @@ const AdminProducts = () => {
                   </tr>
                 ) : (
                   filteredProducts.map((product) => {
-                    const price = product.price || 0;
+                    const price = product.price || 0; // This is the final selling price
+                    const oldPrice = product.oldPrice || price; // This is the original price
                     const discount = product.discount || 0;
-                    const discountedPrice = price * (1 - discount / 100);
 
                     return (
                       <tr key={product.id} className="hover:bg-slate-50/80 transition-colors group">
@@ -155,7 +154,15 @@ const AdminProducts = () => {
                           <div className="flex items-center gap-4">
                             <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center">
                               {product.imageUrl ? (
-                                <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
+                                <img 
+                                  src={product.imageUrl} 
+                                  alt={product.name} 
+                                  className="h-full w-full object-cover" 
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = 'https://placehold.co/100x100?text=No+Image';
+                                  }}
+                                />
                               ) : (
                                 <ImageIcon size={20} className="text-slate-300" />
                               )}
@@ -174,18 +181,22 @@ const AdminProducts = () => {
                           {product.category || 'Chưa phân loại'}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <p className={`font-bold ${discount > 0 ? 'text-slate-400 line-through text-xs' : 'text-slate-900'}`}>
-                            {currency.format(price)}
-                          </p>
+                          {discount > 0 ? (
+                            <p className="font-bold text-slate-400 line-through text-xs">
+                              {currency.format(oldPrice)}
+                            </p>
+                          ) : (
+                            <span className="text-slate-300 text-xs font-medium">-</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right">
                           {discount > 0 ? (
                             <div>
-                              <p className="font-black text-rose-600">{currency.format(discountedPrice)}</p>
+                              <p className="font-black text-rose-600">{currency.format(price)}</p>
                               <p className="text-[10px] font-bold text-rose-500">-{discount}%</p>
                             </div>
                           ) : (
-                            <span className="text-slate-400 text-xs font-medium">-</span>
+                            <p className="font-black text-slate-900">{currency.format(price)}</p>
                           )}
                         </td>
                         <td className="px-6 py-4 text-center">

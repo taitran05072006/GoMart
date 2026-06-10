@@ -58,6 +58,72 @@ const ShipperOrders = () => {
   const [unreadCountsByOrder, setUnreadCountsByOrder] = useState({});
   const [autoOpenChat, setAutoOpenChat] = useState(false);
 
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+
+  const getLocalDateString = (dateString) => {
+    if (!dateString) return '';
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const [selectedCard, setSelectedCard] = useState('ALL');
+
+  // Khi người dùng chọn ngày mới, reset lại bộ lọc trạng thái (card) về "Tất cả"
+  useEffect(() => {
+    setSelectedCard('ALL');
+  }, [selectedDate]);
+
+  const dateFilteredOrders = useMemo(() => {
+    if (!selectedDate) return orders;
+    return orders.filter(o => {
+      // Luôn hiển thị các đơn hàng đang cần xử lý (bất kể ngày nào)
+      const isActive = ['PACKING', 'SHIPPING', 'RETURN_REQUESTED', 'RETURN_PICKING'].includes(o.status);
+      if (isActive) return true;
+      
+      // Đối với đơn đã xong/hủy, chỉ hiện nếu đúng ngày được chọn
+      return getLocalDateString(o.orderDate || o.createdAt) === selectedDate;
+    });
+  }, [orders, selectedDate]);
+
+  const stats = useMemo(() => {
+    // Thống kê dựa trên dateFilteredOrders (để số liệu khớp với những gì hiển thị trên màn hình)
+    return {
+      delivered: dateFilteredOrders.filter(o => o.status === 'DELIVERED' || o.status === 'COMPLETED').length,
+      failed: dateFilteredOrders.filter(o => o.status === 'CANCELLED' || o.status === 'DELIVERY_DISPUTE').length,
+      active: dateFilteredOrders.filter(o => ['PACKING', 'SHIPPING', 'RETURN_REQUESTED', 'RETURN_PICKING'].includes(o.status)).length
+    };
+  }, [dateFilteredOrders]);
+
+  const displayOrders = useMemo(() => {
+    if (selectedCard === 'ALL') return dateFilteredOrders;
+    return dateFilteredOrders.filter(o => {
+      if (selectedCard === 'ACTIVE') return ['PACKING', 'SHIPPING', 'RETURN_REQUESTED', 'RETURN_PICKING'].includes(o.status);
+      if (selectedCard === 'DELIVERED') return o.status === 'DELIVERED' || o.status === 'COMPLETED';
+      if (selectedCard === 'FAILED') return o.status === 'CANCELLED' || o.status === 'DELIVERY_DISPUTE';
+      return true;
+    });
+  }, [dateFilteredOrders, selectedCard]);
+
+  // Tự động chọn đơn hàng đầu tiên trong danh sách hiển thị nếu đơn đang xem không còn nằm trong danh sách
+  useEffect(() => {
+    if (displayOrders.length > 0) {
+      const isSelectedInList = displayOrders.some(o => o.id === selectedId);
+      if (!isSelectedInList) {
+        const newId = displayOrders[0].id;
+        setSelectedId(newId);
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('orderId')) {
+          params.set('orderId', newId);
+          navigate({ search: params.toString() }, { replace: true });
+        }
+      }
+    }
+  }, [displayOrders, selectedId, navigate]);
+
   // Reset count when selected order changes
   useEffect(() => {
     setUnreadCount(0);
@@ -178,7 +244,7 @@ const ShipperOrders = () => {
     try {
       const response = await orderService.getShipperOrders(user.id);
       const data = response?.data || [];
-      
+
       // Sort: Active orders first (PACKING, SHIPPING, RETURN_REQUESTED, RETURN_PICKING), then by date descending
       const isShipperActive = (status) => ['PACKING', 'SHIPPING', 'RETURN_REQUESTED', 'RETURN_PICKING'].includes(status);
       data.sort((a, b) => {
@@ -186,14 +252,14 @@ const ShipperOrders = () => {
         const bActive = isShipperActive(b.status);
         if (aActive && !bActive) return -1;
         if (!aActive && bActive) return 1;
-        
+
         const dateA = new Date(a.orderDate || a.createdAt || 0).getTime();
         const dateB = new Date(b.orderDate || b.createdAt || 0).getTime();
         return dateB - dateA;
       });
 
       setOrders(data);
-      
+
       const orderIdParam = query.get('orderId');
       let nextSelected = selectedId;
       if (orderIdParam) {
@@ -259,11 +325,11 @@ const ShipperOrders = () => {
     const orderIdParam = query.get('orderId');
     if (orderIdParam && orders.length > 0) {
       const found = orders.find(item => String(item.id) === String(orderIdParam) || String(item.orderCode) === String(orderIdParam));
-      if (found && found.id !== selectedId) {
-        setSelectedId(found.id);
+      if (found) {
+        setSelectedId(prev => (prev !== found.id ? found.id : prev));
       }
     }
-  }, [orders, query, selectedId]);
+  }, [orders, query]);
 
   const selectedOrder = useMemo(
     () => orders.find((item) => item.id === selectedId) || null,
@@ -275,7 +341,6 @@ const ShipperOrders = () => {
     setActionLoading(true);
     try {
       await orderService.shipperAcceptOrder(selectedOrder.id, user.id);
-      toast.success('Đã nhận đơn và chuyển sang giao hàng');
       await loadOrders();
       await loadDetail(selectedOrder.id);
     } catch (error) {
@@ -290,7 +355,6 @@ const ShipperOrders = () => {
     setActionLoading(true);
     try {
       await orderService.shipperDeliverOrder(selectedOrder.id, user.id);
-      toast.success('Đã cập nhật đơn hàng đã giao');
       await loadOrders();
       await loadDetail(selectedOrder.id);
     } catch (error) {
@@ -308,7 +372,6 @@ const ShipperOrders = () => {
     setActionLoading(true);
     try {
       await orderService.shipperFailOrder(selectedOrder.id, user.id, reason);
-      toast.success('Đã cập nhật không giao được hàng');
       await loadOrders();
       await loadDetail(selectedOrder.id);
     } catch (error) {
@@ -323,7 +386,6 @@ const ShipperOrders = () => {
     setActionLoading(true);
     try {
       await orderService.shipperReturnPicked(selectedOrder.id, user.id);
-      toast.success('Đã xác nhận lấy hàng hoàn');
       await loadOrders();
       await loadDetail(selectedOrder.id);
     } catch (error) {
@@ -338,7 +400,6 @@ const ShipperOrders = () => {
     setActionLoading(true);
     try {
       await orderService.shipperReturnCompleted(selectedOrder.id, user.id);
-      toast.success('Đã xác nhận hoàn hàng về kho');
       await loadOrders();
       await loadDetail(selectedOrder.id);
     } catch (error) {
@@ -350,15 +411,58 @@ const ShipperOrders = () => {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-4 text-lg font-bold text-slate-900">Đơn hàng được giao</h2>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col h-[calc(100vh-80px)]">
+        <h2 className="mb-4 text-lg font-bold text-slate-900 shrink-0">Đơn hàng được giao</h2>
+
+        <div className="mb-5 space-y-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <input 
+              type="date" 
+              value={selectedDate} 
+              onChange={e => setSelectedDate(e.target.value)}
+              className="flex-1 rounded-xl border border-slate-200 p-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+            />
+            {selectedDate && (
+              <button 
+                onClick={() => setSelectedDate('')} 
+                className="px-3 py-2 text-slate-500 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200 text-xs font-bold whitespace-nowrap"
+              >
+                Tất cả
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+             <div 
+                onClick={() => setSelectedCard(prev => prev === 'ACTIVE' ? 'ALL' : 'ACTIVE')}
+                className={`p-2.5 rounded-xl cursor-pointer transition-all border ${selectedCard === 'ACTIVE' ? 'bg-blue-500 text-white border-blue-600 shadow-md scale-[1.02]' : 'bg-blue-50 border-blue-100 text-blue-700 hover:bg-blue-100'}`}
+             >
+                <p className="font-semibold uppercase tracking-wider text-[9px] opacity-90">Đang giao</p>
+                <p className="text-xl font-black mt-0.5">{stats.active}</p>
+             </div>
+             <div 
+                onClick={() => setSelectedCard(prev => prev === 'DELIVERED' ? 'ALL' : 'DELIVERED')}
+                className={`p-2.5 rounded-xl cursor-pointer transition-all border ${selectedCard === 'DELIVERED' ? 'bg-emerald-500 text-white border-emerald-600 shadow-md scale-[1.02]' : 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100'}`}
+             >
+                <p className="font-semibold uppercase tracking-wider text-[9px] opacity-90">Thành công</p>
+                <p className="text-xl font-black mt-0.5">{stats.delivered}</p>
+             </div>
+             <div 
+                onClick={() => setSelectedCard(prev => prev === 'FAILED' ? 'ALL' : 'FAILED')}
+                className={`p-2.5 rounded-xl cursor-pointer transition-all border ${selectedCard === 'FAILED' ? 'bg-rose-500 text-white border-rose-600 shadow-md scale-[1.02]' : 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100'}`}
+             >
+                <p className="font-semibold uppercase tracking-wider text-[9px] opacity-90">Thất bại</p>
+                <p className="text-xl font-black mt-0.5">{stats.failed}</p>
+             </div>
+          </div>
+        </div>
+
         {loading ? (
-          <p className="py-8 text-sm text-slate-500">Đang tải...</p>
-        ) : orders.length === 0 ? (
-          <p className="py-8 text-sm text-slate-500">Chưa có đơn hàng nào được phân công.</p>
+          <p className="py-8 text-sm text-slate-500 text-center">Đang tải...</p>
+        ) : displayOrders.length === 0 ? (
+          <p className="py-8 text-sm text-slate-500 text-center">Chưa có đơn hàng nào.</p>
         ) : (
-          <div className="space-y-3">
-            {orders.map((order) => (
+          <div className="space-y-3 overflow-y-auto pr-2 pb-4 flex-1">
+            {displayOrders.map((order) => (
               <div
                 key={order.id}
                 onClick={() => {
@@ -555,7 +659,7 @@ const ShipperOrders = () => {
                   <span>💬</span> Trò chuyện với Khách hàng
                 </h4>
                 <div className="flex justify-center bg-slate-50/50 rounded-3xl border border-slate-100/80 py-6 px-12">
-                  <button 
+                  <button
                     onClick={() => {
                       setShowChatModal(true);
                       setUnreadCount(0);
@@ -564,7 +668,7 @@ const ShipperOrders = () => {
                   >
                     <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-amber-200/80 group-hover:shadow-amber-300/80 transition-all duration-300 group-hover:scale-110 active:scale-95 relative">
                       <User size={26} className="group-hover:rotate-12 transition-transform duration-300" />
-                      
+
                       {unreadCount > 0 ? (
                         <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md animate-bounce">
                           {unreadCount}
@@ -588,14 +692,14 @@ const ShipperOrders = () => {
                   <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
                     <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md" onClick={() => setShowChatModal(false)}></div>
                     <div className="relative w-full max-w-xl animate-in zoom-in-95 duration-200 flex flex-col gap-4">
-                      
+
                       {/* Elegant Header Above the Chat Box */}
                       <div className="flex items-center justify-between text-slate-800 bg-white/95 backdrop-blur px-6 py-4 rounded-2xl shadow-sm border border-slate-100/50">
                         <div className="flex items-center gap-2">
                           <span className="text-xl">💬</span>
                           <span className="font-bold text-slate-800 text-sm md:text-base">Trò chuyện với Khách hàng</span>
                         </div>
-                        <button 
+                        <button
                           onClick={() => setShowChatModal(false)}
                           className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-lg font-bold transition-all focus:outline-none"
                         >
@@ -605,11 +709,11 @@ const ShipperOrders = () => {
 
                       {/* Chat Box Container */}
                       <div className="h-[500px]">
-                        <OrderChat 
-                          order={detail} 
-                          currentUser={user} 
-                          role="SHIPPER" 
-                          forcedChannel="CUSTOMER_SHIPPER" 
+                        <OrderChat
+                          order={detail}
+                          currentUser={user}
+                          role="SHIPPER"
+                          forcedChannel="CUSTOMER_SHIPPER"
                         />
                       </div>
                     </div>

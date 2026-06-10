@@ -35,7 +35,6 @@ export default function AdminShippingConfig() {
         ...current,
         ...saved,
       }));
-      toast.success('Đã cập nhật cấu hình vận chuyển');
     } catch (err) {
       console.error(err);
       toast.error('Cập nhật thất bại');

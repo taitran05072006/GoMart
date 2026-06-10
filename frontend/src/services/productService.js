@@ -4,8 +4,8 @@ const productService = {
   getAll: async () => {
     return axiosClient.get('/products');
   },
-  getByStoreId: async (storeId) => {
-    return axiosClient.get(`/stores/${storeId}/products`);
+  getByStoreId: async (storeId, { includeOutOfStock } = {}) => {
+    return axiosClient.get(`/stores/${storeId}/products`, { params: { includeOutOfStock } });
   },
   create: async (data, storeId) => {
     return axiosClient.post('/products', data, { params: { storeId } });

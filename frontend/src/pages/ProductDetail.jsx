@@ -96,7 +96,7 @@ const ProductDetail = () => {
             <div className="mb-10">
               <div className="flex items-center gap-2 mb-4">
                 <Package className="text-indigo-500" size={18} />
-                <span className="text-sm font-black text-slate-900 uppercase tracking-widest">ĐƠN VỊ TÍNH</span>
+                <span className="text-sm font-black text-slate-900 uppercase tracking-widest"></span>
               </div>
               <div className="flex flex-wrap gap-3">
                 <button
@@ -137,7 +137,28 @@ const ProductDetail = () => {
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   disabled={quantity <= 1}
                 >-</button>
-                <span className="px-8 py-4 font-black text-slate-900 border-x-2 border-slate-100 min-w-[80px] text-center text-xl">{quantity}</span>
+                <input
+                  type="number"
+                  min="1"
+                  className="py-4 font-black text-slate-900 border-x-2 border-slate-100 w-[80px] text-center text-xl focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  value={quantity}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setQuantity('');
+                      return;
+                    }
+                    const num = parseInt(val, 10);
+                    if (!isNaN(num) && num >= 1) {
+                      setQuantity(num);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (quantity === '' || quantity < 1) {
+                      setQuantity(1);
+                    }
+                  }}
+                />
                 <button
                   className="px-8 py-4 text-slate-400 hover:bg-slate-50 hover:text-slate-900 transition-colors text-xl font-bold"
                   onClick={() => setQuantity(quantity + 1)}

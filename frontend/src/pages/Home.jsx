@@ -6,7 +6,6 @@ import productService from '../services/productService';
 import { VoucherContext } from '../context/VoucherContext';
 import { AuthContext } from '../context/AuthContext';
 import ProductCard from '../components/common/ProductCard';
-import toast from 'react-hot-toast';
 
 // Fetch function
 const fetchProducts = async (storeId) => {
@@ -255,7 +254,6 @@ const Home = () => {
                                                     }
                                                     const res = await collectVoucher(user?.id, v.code);
                                                     if (res.success) {
-                                                        toast.success('Đã lưu mã thành công!');
                                                         // Refresh available vouchers to update flags
                                                         fetchAvailableVouchers(user.id);
                                                     }

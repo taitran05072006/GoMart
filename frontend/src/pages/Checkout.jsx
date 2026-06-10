@@ -26,7 +26,7 @@ const PAYMENT_OPTIONS = [
     method: 'BANK_TRANSFER',
     label: 'Chuyển Khoản Ngân Hàng',
     subtitle: 'Quét QR hoặc chuyển khoản vào tài khoản ngân hàng',
-    type: 'TRANSFER',
+    type: 'ONLINE',
   },
 ];
 
@@ -55,7 +55,8 @@ const Checkout = () => {
   const [selectedStoreId, setSelectedStoreId] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const [selectedCoords, setSelectedCoords] = useState(null);
-  const [mapAddress, setMapAddress] = useState(null); 
+  const [mapAddress, setMapAddress] = useState(null);
+  const [mapAddressDetails, setMapAddressDetails] = useState('');
   const [voucherCodeInput, setVoucherCodeInput] = useState('');
   const [shippingVoucherCodeInput, setShippingVoucherCodeInput] = useState('');
   const [autoSelectedStore, setAutoSelectedStore] = useState(false);
@@ -85,9 +86,12 @@ const Checkout = () => {
   const totalDiscount = discountAmount + starDiscount + shippingDiscountAmount;
   const transferAmount = Math.max(0, selectedSubtotal - (discountAmount + starDiscount) + (shippingFee - shippingDiscountAmount));
 
-  const availablePaymentOptions = supportedPaymentMethods.length > 0
+  const availablePaymentOptions = (supportedPaymentMethods.length > 0
     ? PAYMENT_OPTIONS.filter((item) => supportedPaymentMethods.includes(item.method))
-    : PAYMENT_OPTIONS;
+    : PAYMENT_OPTIONS).filter((item) => {
+      if (transferAmount <= 0 && item.method === 'BANK_TRANSFER') return false;
+      return true;
+    });
 
   const selectedPayment = availablePaymentOptions.find((item) => item.id === selectedPaymentId)
     || availablePaymentOptions[0]
@@ -253,7 +257,6 @@ const Checkout = () => {
         if (d > selectedSubtotal) d = selectedSubtotal;
         setDiscountAmount(d);
         setVoucherCodeInput(v.code);
-        toast.success('Đã áp dụng Voucher đơn hàng!');
         setShowVoucherModal(false);
       }
     } catch (err) {
@@ -279,7 +282,6 @@ const Checkout = () => {
         if (d > shippingFee) d = shippingFee;
         setShippingDiscountAmount(d);
         setShippingVoucherCodeInput(v.code);
-        toast.success('Đã áp dụng Voucher vận chuyển!');
         setShowVoucherModal(false);
       }
     } catch (err) {
@@ -423,7 +425,6 @@ const Checkout = () => {
       setUseStarsInput(0);
       setStarDiscount(0);
     } else {
-      toast.success('Đã áp dụng toàn bộ sao tích lũy!');
     }
   };
 
@@ -465,7 +466,9 @@ const Checkout = () => {
       const cappedStars = Math.min(parsedStars, user?.rewardStars || 0, maxStarsByAmount);
 
       const defaultAddress = [user.houseNumber, user.ward, user.district, user.province].filter(Boolean).join(', ');
-      const finalAddress = mapAddress || defaultAddress;
+      const finalAddress = mapAddress 
+        ? (mapAddressDetails.trim() ? `${mapAddressDetails.trim()}, ${mapAddress}` : mapAddress) 
+        : defaultAddress;
 
       const orderRequest = {
         userId: user.id,
@@ -520,13 +523,11 @@ const Checkout = () => {
           }
           setPaymentSession(session);
           setShowQRModal(true);
-          toast.success('Đơn hàng đã tạo! Vui lòng quét QR để hoàn tất thanh toán.');
           return;
         }
 
         // COD
         if (selectedPayment.method === 'COD') {
-          toast.success('Đặt hàng COD thành công!');
           await fetchCart();
           navigate('/profile?tab=orders');
           return;
@@ -563,7 +564,9 @@ const Checkout = () => {
     const cappedStars = Math.min(parsedStars, user?.rewardStars || 0, maxStarsByAmount);
 
     const defaultAddress = [user.houseNumber, user.ward, user.district, user.province].filter(Boolean).join(', ');
-    const finalAddress = mapAddress || defaultAddress;
+    const finalAddress = mapAddress 
+      ? (mapAddressDetails.trim() ? `${mapAddressDetails.trim()}, ${mapAddress}` : mapAddress) 
+      : defaultAddress;
 
     const orderRequest = {
       userId: user.id,
@@ -624,7 +627,6 @@ const Checkout = () => {
           onCancel={async () => {
             setShowQRModal(false);
             await fetchCart();
-            toast.success('Đơn hàng đã được lưu. Bạn có thể thanh toán sau trong Lịch sử đơn hàng.');
             navigate('/profile?tab=orders', { replace: true });
           }}
         />
@@ -671,8 +673,6 @@ const Checkout = () => {
           onSelect={async (coords) => {
             setSelectedCoords(coords);
             setShowMap(false);
-            toast.success('Đã chọn vị trí giao hàng');
-            // Reverse geocode with Nominatim
             try {
               const resp = await fetch(
                 `https://nominatim.openstreetmap.org/reverse?lat=${coords[0]}&lon=${coords[1]}&format=json&accept-language=vi`,
@@ -715,6 +715,15 @@ const Checkout = () => {
                           <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full uppercase tracking-wide">📍 Vị trí bản đồ</span>
                         </div>
                         <p className="font-semibold text-gray-900 text-sm leading-snug">{mapAddress}</p>
+                        <div className="mt-2 w-full">
+                          <input
+                            type="text"
+                            placeholder="Nhập số nhà, hẻm, tên tòa nhà..."
+                            value={mapAddressDetails}
+                            onChange={(e) => setMapAddressDetails(e.target.value)}
+                            className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 outline-none"
+                          />
+                        </div>
                         {/* Distance to selected store */}
                         {selectedStoreId && (() => {
                           const s = stores.find(x => x.id === selectedStoreId);
@@ -743,10 +752,7 @@ const Checkout = () => {
                           }
                           return null;
                         })()}
-                        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-200">
-                          <p className="text-sm text-gray-500 font-medium">Người nhận: <span className="text-gray-900">{user.name}</span></p>
-                          <p className="text-sm text-gray-500 font-medium">SĐT: <span className="text-gray-900">{user.phone}</span></p>
-                        </div>
+
                       </>
                     )}
                   </div>
@@ -781,7 +787,7 @@ const Checkout = () => {
                           const s = stores.find(x => x.id === selectedStoreId);
                           return (
                             <>
-                              <p className="font-bold text-sm">Được tự động chọn: {s?.name}</p>
+                              <p className="font-bold text-sm">{s?.name}</p>
                               <p className="text-xs mt-1 text-blue-600/80">{s?.address}</p>
                               {selectedCoords && selectedStoreId && s?.latitude && s?.longitude && (
                                 <p className="text-xs text-blue-600 font-semibold mt-1">
@@ -860,7 +866,7 @@ const Checkout = () => {
               {(user?.rewardStars || 0) > 0 && (
                       <div className="border-t pt-6 mt-6">
                         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                          <span>⭐</span> Tích Lũy Sao
+                          <span>⭐</span> Sao Tích Lũy Của Bạn
                         </h2>
                         <div className="bg-amber-50 border border-amber-200 rounded-[24px] p-6">
                   <div className="flex items-center justify-between gap-4">
@@ -907,7 +913,7 @@ const Checkout = () => {
           {/* Order Summary */}
           <div className="lg:w-1/3">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-24">
-              <h2 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4">Tóm Tắt Đơn Hàng</h2>
+              <h2 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4">Đơn Hàng</h2>
 
               <div className="space-y-4 max-h-60 overflow-y-auto mb-6 pr-2">
                 {selectedItems.map((item, idx) => (

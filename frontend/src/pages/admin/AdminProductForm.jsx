@@ -202,9 +202,9 @@ const AdminProductForm = () => {
       importUnitName: firstImport ? firstImport.name : null,
       importConversionRate: firstImport ? firstImport.conversionRate : (form.importConversionRate ? Number(form.importConversionRate) : 1),
       importUnits: importUnitsPayload,
-      units: form.units.map(u => ({ 
-        ...u, 
-        price: u.oldPrice !== undefined ? u.oldPrice : u.price 
+      units: form.units.map(u => ({
+        ...u,
+        price: u.oldPrice !== undefined ? u.oldPrice : u.price
       })),
     };
 
@@ -224,11 +224,10 @@ const AdminProductForm = () => {
         } else {
           await productService.update(id, payload);
         }
-        toast.success('Sản phẩm đã được cập nhật thành công');
       } else {
         const targetStoreId = user?.role === 'STORE_ADMIN' && user?.storeId ? user.storeId : (user?.role === 'SUPER_ADMIN' && impersonatedStoreId ? impersonatedStoreId : null);
         await productService.create(payload, targetStoreId);
-        toast.success('Sản phẩm đã được tạo thành công');
+
       }
       navigate('/admin/products');
     } catch (error) {

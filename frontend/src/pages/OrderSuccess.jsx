@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import paymentService from '../services/Payment';
 
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
@@ -47,7 +46,6 @@ const OrderSuccess = () => {
 
         setPayment(latestPayment);
         if (latestPayment.status === 'PAID') {
-          toast.success('Thanh toán đã được webhook xác nhận thành công.');
           window.localStorage.setItem('lastOrderId', `#GM-${orderId}`);
         }
       } catch (error) {

@@ -124,7 +124,11 @@ const AdminVouchers = () => {
                     </div>
                   </td>
                   <td className="px-5 py-4 text-slate-700">{voucher.discountType === 'PERCENT' ? 'Giảm phần trăm' : 'Giảm số tiền'}</td>
-                  <td className="px-5 py-4 text-center text-slate-700">{voucher.value}</td>
+                  <td className="px-5 py-4 text-center text-slate-700 font-medium">
+                    {voucher.discountType === 'PERCENT'
+                      ? `${voucher.value}%`
+                      : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(voucher.value)}
+                  </td>
                   <td className="px-5 py-4 text-center text-slate-700">{voucher.usedCount || 0}/{voucher.usageLimit || 0}</td>
                   <td className="px-5 py-4 text-center text-xs text-slate-500">
                     <div>{formatDateTime(voucher.startDate)}</div>

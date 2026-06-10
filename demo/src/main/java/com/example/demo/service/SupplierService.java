@@ -11,12 +11,14 @@ import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.repository.StoreRepository;
 import com.example.demo.repository.SupplierRepository;
 import com.example.demo.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class SupplierService {
 
     private final SupplierRepository supplierRepository;
@@ -144,6 +146,17 @@ public class SupplierService {
     }
 
     private SupplierResponseDto mapToDto(Supplier supplier) {
+        Long storeId = null;
+        String storeName = null;
+        if (supplier.getStore() != null) {
+            try {
+                storeId = supplier.getStore().getId();
+                storeName = supplier.getStore().getName();
+            } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.ObjectNotFoundException e) {
+                // Store was soft deleted or physically removed
+            }
+        }
+
         return SupplierResponseDto.builder()
                 .id(supplier.getId())
                 .name(supplier.getName())
@@ -151,8 +164,8 @@ public class SupplierService {
                 .address(supplier.getAddress())
                 .email(supplier.getEmail())
                 .supplyType(supplier.getSupplyType())
-                .storeId(supplier.getStore() != null ? supplier.getStore().getId() : null)
-                .storeName(supplier.getStore() != null ? supplier.getStore().getName() : null)
+                .storeId(storeId)
+                .storeName(storeName)
                 .build();
     }
 }

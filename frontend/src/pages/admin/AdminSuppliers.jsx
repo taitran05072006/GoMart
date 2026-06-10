@@ -90,7 +90,7 @@ const AdminSuppliers = () => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa nhà cung cấp này?')) return;
     try {
       await axiosClient.delete(`/suppliers/${id}`);
-      toast.success('Xóa nhà cung cấp thành công');
+
       fetchSuppliers();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Xóa thất bại');
@@ -115,10 +115,10 @@ const AdminSuppliers = () => {
     try {
       if (editingSupplier) {
         await axiosClient.put(`/suppliers/${editingSupplier.id}`, payload);
-        toast.success('Cập nhật thành công');
+
       } else {
         await axiosClient.post('/suppliers', payload);
-        toast.success('Thêm mới thành công');
+        
       }
       setShowModal(false);
       fetchSuppliers();

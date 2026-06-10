@@ -53,7 +53,6 @@ const AdminShipping = () => {
           ...saved,
         }));
       }
-      toast.success('Cập nhật cấu hình phí vận chuyển thành công');
       await fetchConfig();
     } catch (err) {
       toast.error('Lỗi khi cập nhật cấu hình phí vận chuyển');

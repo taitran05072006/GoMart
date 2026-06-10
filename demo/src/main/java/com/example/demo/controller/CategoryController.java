@@ -25,7 +25,10 @@ public class CategoryController {
     }
 
     @GetMapping
-    public ApiResponse<List<CategoryResponseDto>> getAll() {
+    public ApiResponse<List<CategoryResponseDto>> getAll(@RequestParam(required = false) Long storeId) {
+        if (storeId != null) {
+            return ApiResponse.success("Lấy danh mục thành công", categoryService.getByStoreId(storeId));
+        }
         return ApiResponse.success("Lấy danh mục thành công", categoryService.getAll());
     }
 

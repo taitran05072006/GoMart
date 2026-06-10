@@ -28,11 +28,7 @@ const NavbarUserMenu = () => {
   <User size={24} />
   <div className="flex flex-col items-start leading-none">
     <span className="hidden md:inline font-bold text-sm">{user?.name || 'Hồ sơ'}</span>
-    {user?.tier && (
-      <span className="text-[9px] font-black uppercase tracking-widest text-amber-300">
-        {user.tier}
-      </span>
-    )}
+
   </div>
 
   <div

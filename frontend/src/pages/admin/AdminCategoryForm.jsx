@@ -67,10 +67,8 @@ const AdminCategoryForm = () => {
     try {
       if (isEdit) {
         await categoryService.update(id, payload);
-        toast.success('Cập nhật danh mục thành công');
       } else {
         await categoryService.create(payload);
-        toast.success('Tạo danh mục thành công');
       }
 
       navigate('/admin/categories');

@@ -160,7 +160,6 @@ const AdminAccounts = () => {
     }
     try {
       await authService.deleteAdminCustomer(userId);
-      toast.success('Xóa tài khoản thành công');
       loadData();
     } catch (error) {
       console.error(error);
@@ -318,7 +317,7 @@ const AdminAccounts = () => {
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
                                       {shippers.filter(s => s.storeId === admin.storeId).map((shipper) => (
-                                        <tr 
+                                        <tr
                                           key={shipper.id}
                                           onClick={() => setSelectedShipper(shipper)}
                                           className="cursor-pointer hover:bg-slate-50 transition"
@@ -327,7 +326,7 @@ const AdminAccounts = () => {
                                           <td className="py-2">{shipper.email}</td>
                                           <td className="py-2">{shipper.phone}</td>
                                           <td className="py-2 text-right">
-                                            <button 
+                                            <button
                                               type="button"
                                               className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                                             >
@@ -366,8 +365,8 @@ const AdminAccounts = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {(user?.role === 'SUPER_ADMIN' && impersonatedStoreId ? shippers.filter(s => String(s.storeId) === String(impersonatedStoreId)) : shippers).map((shipper) => (
-                    <tr 
-                      key={shipper.id} 
+                    <tr
+                      key={shipper.id}
                       onClick={() => setSelectedShipper(shipper)}
                       className="cursor-pointer hover:bg-slate-100/50 transition"
                     >
@@ -375,7 +374,7 @@ const AdminAccounts = () => {
                       <td className="px-4 py-3">{shipper.email}</td>
                       <td className="px-4 py-3">{shipper.phone}</td>
                       <td className="px-4 py-3 text-right">
-                        <button 
+                        <button
                           type="button"
                           className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                         >
@@ -393,11 +392,11 @@ const AdminAccounts = () => {
 
       {/* Modal chi tiết Shipper */}
       {selectedShipper && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
           onClick={() => setSelectedShipper(null)}
         >
-          <div 
+          <div
             className="w-full max-w-lg overflow-hidden rounded-[32px] border border-slate-100 bg-white shadow-2xl transition-all animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >

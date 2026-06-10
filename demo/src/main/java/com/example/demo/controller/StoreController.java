@@ -155,8 +155,8 @@ public class StoreController {
     }
 
     @GetMapping("/{id}/products")
-    public ApiResponse<List<ProductResponseDto>> productsByStore(@PathVariable Long id) {
-        return ApiResponse.success(productService.getByStoreId(id));
+    public ApiResponse<List<ProductResponseDto>> productsByStore(@PathVariable Long id, @RequestParam(required = false, defaultValue = "false") boolean includeOutOfStock) {
+        return ApiResponse.success(productService.getByStoreId(id, includeOutOfStock));
     }
 
     @GetMapping("/{id}/shippers")

@@ -27,8 +27,11 @@ const STATUS_MAP = {
   DELIVERED:            { label: 'Đã giao',      color: '#10b981', bg: '#d1fae5', text: '#065f46' },
   COMPLETED:            { label: 'Đã giao',      color: '#10b981', bg: '#d1fae5', text: '#065f46' },
   CANCELLED:            { label: 'Đã hủy',       color: '#ef4444', bg: '#fee2e2', text: '#991b1b' },
+  LOST:                 { label: 'Thất lạc',     color: '#1e293b', bg: '#f1f5f9', text: '#334155' },
+  DELIVERY_DISPUTE:     { label: 'Khiếu nại',    color: '#e11d48', bg: '#ffe4e6', text: '#9f1239' },
   RETURN_REQUESTED:     { label: 'Hoàn hàng',    color: '#f97316', bg: '#ffedd5', text: '#9a3412' },
   RETURN_PICKING:       { label: 'Hoàn hàng',    color: '#f97316', bg: '#ffedd5', text: '#9a3412' },
+  RETURN_AWAITING_ADMIN_CONFIRM:{ label: 'Chờ duyệt hoàn', color: '#f97316', bg: '#ffedd5', text: '#9a3412' },
   RETURNED_TO_WAREHOUSE:{ label: 'Hoàn hàng',    color: '#f97316', bg: '#ffedd5', text: '#9a3412' },
   RETURNED:             { label: 'Hoàn hàng',    color: '#f97316', bg: '#ffedd5', text: '#9a3412' },
 };
@@ -291,10 +294,11 @@ const AdminDashboard = () => {
 
   /* Revenue chart data */
   const revenueChartData = useMemo(() => {
-    if (timeRange.type === 'today' || timeRange.type === 'yesterday') {
-      const baseDay = timeRange.type === 'yesterday'
-        ? new Date(today.getTime() - 86400000)
-        : new Date(today);
+    const days = Math.max(1, Math.ceil((effectiveRange.end.getTime() - effectiveRange.start.getTime() + 1) / 86400000));
+
+    // Nếu khoảng thời gian là 1 ngày (Hôm nay, Hôm qua, hoặc tự chọn 1 ngày), vẽ biểu đồ theo giờ
+    if (days <= 1) {
+      const baseDay = new Date(effectiveRange.start);
       baseDay.setHours(0, 0, 0, 0);
 
       const result = [];
@@ -316,7 +320,7 @@ const AdminDashboard = () => {
       return result;
     }
 
-    const days = Math.max(1, Math.ceil((effectiveRange.end.getTime() - effectiveRange.start.getTime() + 1) / 86400000));
+    // Nếu khoảng thời gian là nhiều ngày, vẽ biểu đồ theo từng ngày
     const result = [];
     for (let i = days - 1; i >= 0; i--) {
       const dayStart = new Date(effectiveRange.end.getTime() - i * 86400000);
@@ -334,7 +338,7 @@ const AdminDashboard = () => {
       });
     }
     return result;
-  }, [timeRange, revenueOrders, effectiveRange]);
+  }, [revenueOrders, effectiveRange]);
 
   /* Order status donut */
   const orderStatusGroups = useMemo(() => {

@@ -155,7 +155,7 @@ const AdminVoucherForm = () => {
       navigate('/admin/vouchers');
     } catch (error) {
       console.error(error);
-      toast.error('Unable to save voucher');
+      toast.error(error.message || 'Unable to save voucher');
     } finally {
       setSaving(false);
     }
@@ -199,19 +199,14 @@ const AdminVoucherForm = () => {
         <Field label="Ngày bắt đầu" name="startDate" type="datetime-local" value={form.startDate} onChange={handleChange} />
         <Field label="Ngày kết thúc" name="endDate" type="datetime-local" value={form.endDate} onChange={handleChange} />
         <Field label="Giới hạn sử dụng" name="usageLimit" type="number" min="1" value={form.usageLimit} onChange={handleChange} required />
-        
-        <Field label="Hạng yêu cầu" as="select" name="requiredTier" value={form.requiredTier} onChange={handleChange}>
-          <option value="MEMBER">Thành viên (Đồng)</option>
-          <option value="SILVER">Bạc</option>
-          <option value="GOLD">Vàng</option>
-          <option value="DIAMOND">Kim cương</option>
-        </Field>
+
+        {/* Removed Hạng yêu cầu - defaulting to MEMBER */}
 
         <div className="lg:col-span-2">
           <div className="mb-4">
             <label className="mb-2 block text-sm font-semibold text-slate-700">Áp dụng cho sản phẩm (Để trống nếu áp dụng cho tất cả)</label>
             <div className="flex flex-wrap items-center gap-3">
-              <select 
+              <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
                 className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400 bg-white"
@@ -220,7 +215,7 @@ const AdminVoucherForm = () => {
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
 
-              <select 
+              <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
                 className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400 bg-white"
@@ -231,9 +226,9 @@ const AdminVoucherForm = () => {
               </select>
 
               <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Tìm sản phẩm..." 
+                <input
+                  type="text"
+                  placeholder="Tìm sản phẩm..."
                   className="rounded-xl border border-slate-200 px-4 py-2 text-xs outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 min-w-[150px]"
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -250,7 +245,7 @@ const AdminVoucherForm = () => {
                   const filteredIds = filtered.map(p => p.id);
                   const newIds = Array.from(new Set([...form.applicableProductIds, ...filteredIds]));
                   setForm(f => ({ ...f, applicableProductIds: newIds }));
-                  toast.success(`Đã chọn ${filteredIds.length} sản phẩm`);
+                 
                 }}
                 className="rounded-xl bg-blue-50 px-3 py-2 text-[10px] font-bold text-blue-700 hover:bg-blue-100 transition-colors uppercase"
               >
@@ -267,7 +262,7 @@ const AdminVoucherForm = () => {
               })
               .sort((a, b) => {
                 if (sortOrder === 'NAME_ASC') return a.name.localeCompare(b.name);
-                
+
                 const dateA = a.expiryDate ? new Date(a.expiryDate) : null;
                 const dateB = b.expiryDate ? new Date(b.expiryDate) : null;
 
@@ -284,11 +279,11 @@ const AdminVoucherForm = () => {
               })
               .map(product => (
                 <label key={product.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors border-b border-slate-50 last:border-0">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={form.applicableProductIds.includes(product.id)}
                   onChange={(e) => {
-                    const ids = e.target.checked 
+                    const ids = e.target.checked
                       ? [...form.applicableProductIds, product.id]
                       : form.applicableProductIds.filter(id => id !== product.id);
                     setForm(f => ({ ...f, applicableProductIds: ids }));
@@ -313,10 +308,10 @@ const AdminVoucherForm = () => {
 
         <div className="lg:col-span-2 flex items-center gap-3 bg-slate-50 p-4 rounded-2xl">
           <label className="inline-flex items-center gap-3 text-sm font-bold text-slate-700 cursor-pointer">
-            <input 
-              type="checkbox" 
-              name="isActive" 
-              checked={form.isActive} 
+            <input
+              type="checkbox"
+              name="isActive"
+              checked={form.isActive}
               onChange={handleChange}
               className="w-5 h-5 rounded border-slate-300 text-green-600 focus:ring-green-500"
             />

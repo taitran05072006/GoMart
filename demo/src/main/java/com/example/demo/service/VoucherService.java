@@ -342,13 +342,21 @@ public class VoucherService {
         Voucher voucher = voucherRepository.findByCode(code).orElse(null);
         if (voucher == null) return;
 
-        userVoucherRepository.findByUser(user).stream()
-                .filter(uv -> uv.getVoucher().getCode().equalsIgnoreCase(code) && !uv.isUsed())
+        UserVoucher userVoucher = userVoucherRepository.findByUser(user).stream()
+                .filter(uv -> uv.getVoucher().getCode().equalsIgnoreCase(code))
                 .findFirst()
-                .ifPresent(uv -> {
-                    uv.setUsed(true);
-                    userVoucherRepository.save(uv);
-                });
+                .orElse(null);
+
+        if (userVoucher == null) {
+            userVoucher = UserVoucher.builder()
+                    .user(user)
+                    .voucher(voucher)
+                    .used(true)
+                    .build();
+        } else {
+            userVoucher.setUsed(true);
+        }
+        userVoucherRepository.save(userVoucher);
 
         if (voucher.getUsedCount() == null) voucher.setUsedCount(0);
         voucher.setUsedCount(voucher.getUsedCount() + 1);

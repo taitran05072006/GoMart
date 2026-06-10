@@ -49,7 +49,9 @@ public class InventoryAdminService {
             filteredInventories = allInventories;
         }
 
-        List<Product> allProducts = productRepository.findAll();
+        List<Product> allProducts = productRepository.findAll().stream()
+                .filter(p -> p.getIsDeleted() == null || !p.getIsDeleted())
+                .collect(Collectors.toList());
 
         Map<Long, List<Inventory>> byProduct = filteredInventories.stream()
                 .filter(inv -> inv.getProduct() != null)
@@ -72,6 +74,8 @@ public class InventoryAdminService {
                             .productName(p.getName())
                             .unit(p.getUnit())
                             .totalQuantity(total)
+                            .expiryDate(p.getExpiryDate())
+                            .expiryThresholdDays(p.getCategory() != null && p.getCategory().getExpiryThresholdDays() != null ? p.getCategory().getExpiryThresholdDays() : 0)
                             .stores(stores)
                             .build();
                 })
@@ -99,6 +103,8 @@ public class InventoryAdminService {
                                         .price(inv != null && inv.getSellingPrice() != null ? inv.getSellingPrice() : p.getPrice())
                                         .oldBatchQuantity(inv != null && inv.getOldBatchQuantity() != null ? inv.getOldBatchQuantity() : 0)
                                         .newBatchQuantity(inv != null && inv.getNewBatchQuantity() != null ? inv.getNewBatchQuantity() : 0)
+                                        .expiryDate(p.getExpiryDate())
+                                        .expiryThresholdDays(p.getCategory() != null && p.getCategory().getExpiryThresholdDays() != null ? p.getCategory().getExpiryThresholdDays() : 0)
                                         .build();
                             })
                             .sorted(Comparator.comparing(InventoryStoreProductDto::getProductName, Comparator.nullsLast(String::compareToIgnoreCase)))

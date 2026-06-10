@@ -92,7 +92,8 @@ const AdminCategories = () => {
       setCategories((current) => current.filter((category) => category.id !== id));
     } catch (deleteError) {
       console.error(deleteError);
-      alert('Xóa thất bại');
+      const msg = deleteError.response?.data?.message || deleteError.response?.data || 'Xóa thất bại';
+      alert(msg);
     }
   };
 
@@ -270,6 +271,7 @@ const AdminCategories = () => {
                           </td>
                           <td className="px-5 py-3 text-center font-medium text-white/95">
                             {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(product.oldPrice || 0))}
+                            {product.unit ? <span className="text-white/60 text-xs ml-1">/ {product.unit}</span> : ''}
                           </td>
                           <td className="px-5 py-3 text-center">
                             <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${Number(product.stock || 0) > 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>

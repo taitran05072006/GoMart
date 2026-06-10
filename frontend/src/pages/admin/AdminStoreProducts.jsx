@@ -29,7 +29,7 @@ const AdminStoreProducts = () => {
     setLoading(true);
     try {
       const [storeRes, systemRes] = await Promise.all([
-        productService.getByStoreId(storeId),
+        productService.getByStoreId(storeId, { includeOutOfStock: true }),
         productService.getAll()
       ]);
       const data = storeRes?.data?.data || storeRes?.data || storeRes || [];
@@ -69,7 +69,6 @@ const AdminStoreProducts = () => {
     setSavingId(productId);
     try {
       await productService.toggleSelling(productId, storeId);
-      toast.success('Đã cập nhật trạng thái bán');
       await fetchProducts();
     } catch (error) {
       console.error(error);
@@ -87,7 +86,6 @@ const AdminStoreProducts = () => {
     if (!window.confirm('Bạn có chắc muốn xóa sản phẩm này không? Hành động không thể hoàn tác.')) return;
     try {
       await productService.delete(product.id);
-      toast.success('Đã xóa sản phẩm');
       await fetchProducts();
     } catch (err) {
       console.error(err);
@@ -144,10 +142,10 @@ const AdminStoreProducts = () => {
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        {loading ? (
+        {loading && currentList.length === 0 ? (
           <div className="py-16 text-center text-slate-500">Đang tải sản phẩm...</div>
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className={`min-w-full divide-y divide-slate-200 text-sm ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="px-5 py-4 text-left font-semibold">Sản phẩm</th>

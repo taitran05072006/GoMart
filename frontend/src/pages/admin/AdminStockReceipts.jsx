@@ -39,14 +39,14 @@ const AdminStockReceipts = () => {
 
   useEffect(() => {
     fetchReceipts();
-  }, []);
+  }, [impersonatedStoreId]);
 
   const handleUpdateStatus = async (id, newStatus) => {
     if (!window.confirm(`Bạn có chắc muốn ${newStatus === 'APPROVED' ? 'duyệt' : 'từ chối'} phiếu nhập này?`)) return;
     try {
       const response = await axiosClient.put(`/admin/stock-receipts/${id}/status`, { status: newStatus });
       // axiosClient returns response.data by default; assume success if no error thrown
-      toast.success(`Đã ${newStatus === 'APPROVED' ? 'duyệt' : 'từ chối'} thành công`);
+    
       await fetchReceipts();
     } catch (err) {
       console.error('Update status failed', err);
@@ -57,16 +57,19 @@ const AdminStockReceipts = () => {
 
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase();
+
+    let result = receipts || [];
+
     if (!keyword) {
-      return receipts;
+      return result;
     }
 
-    return receipts.filter((receipt) =>
+    return result.filter((receipt) =>
       [receipt.code, receipt.supplier, receipt.note]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(keyword))
     );
-  }, [receipts, search]);
+  }, [receipts, search, user, impersonatedStoreId]);
 
   return (
     <div className="space-y-6">

@@ -160,7 +160,6 @@ public class OrderService {
                 productRepository.save(product);
             }
 
-            double enteredPrice;
             String targetUnit = itemDto.getUnit() != null ? itemDto.getUnit().trim() : "";
 
             ProductUnit matchedUnit = productUnitRepository.findByProductId(product.getId())
@@ -169,15 +168,16 @@ public class OrderService {
                     .findFirst()
                     .orElse(null);
 
+            double finalUnitPrice;
             if (matchedUnit != null && matchedUnit.getPrice() != null) {
-                enteredPrice = matchedUnit.getPrice().doubleValue();
+                // matchedUnit price is the ORIGINAL price, so we MUST apply the discount
+                double enteredPrice = matchedUnit.getPrice().doubleValue();
+                double discountPercent = product.getDiscount() != null ? product.getDiscount() : 0.0;
+                finalUnitPrice = enteredPrice * (1 - discountPercent / 100.0);
             } else {
-                enteredPrice = product.getPrice().doubleValue()
-                        * (itemDto.getConversionRate() != null ? itemDto.getConversionRate() : 1.0);
+                // product.getPrice() is ALREADY the discounted price in the database
+                finalUnitPrice = product.getPrice() != null ? product.getPrice().doubleValue() * (itemDto.getConversionRate() != null ? itemDto.getConversionRate() : 1.0) : 0.0;
             }
-
-            double discountPercent = product.getDiscount() != null ? product.getDiscount() : 0.0;
-            double finalUnitPrice = enteredPrice * (1 - discountPercent / 100.0);
 
             return OrderItem.builder()
                     .order(order)
@@ -363,7 +363,6 @@ public class OrderService {
 
         orderRepository.save(order);
 
-        // Clean up cart
         List<Long> orderedProductIds = items.stream()
                 .map(i -> i.getProduct() != null ? i.getProduct().getId() : null)
                 .filter(java.util.Objects::nonNull)
@@ -452,15 +451,16 @@ public class OrderService {
                     .findFirst()
                     .orElse(null);
 
-            double enteredPrice;
+            double finalUnitPrice;
             if (matchedUnit != null && matchedUnit.getPrice() != null) {
-                enteredPrice = matchedUnit.getPrice().doubleValue();
+                // matchedUnit price is the ORIGINAL price, so we MUST apply the discount
+                double enteredPrice = matchedUnit.getPrice().doubleValue();
+                double discountPercent = product.getDiscount() != null ? product.getDiscount() : 0.0;
+                finalUnitPrice = enteredPrice * (1 - discountPercent / 100.0);
             } else {
-                enteredPrice = product.getPrice() != null ? product.getPrice().doubleValue() * conversionRate : 0.0;
+                // product.getPrice() is ALREADY the discounted price in the database
+                finalUnitPrice = product.getPrice() != null ? product.getPrice().doubleValue() * conversionRate : 0.0;
             }
-
-            double discountPercent = product.getDiscount() != null ? product.getDiscount() : 0.0;
-            double finalUnitPrice = enteredPrice * (1 - discountPercent / 100.0);
 
             OrderItem oi = OrderItem.builder()
                     .product(product)

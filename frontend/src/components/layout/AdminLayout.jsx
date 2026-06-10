@@ -208,11 +208,14 @@ const AdminLayout = () => {
                 <Ticket size={18} />
                 Vouchers
               </NavLink>
-              <NavLink to="/admin/customers" className={navItemClass}>
-                <Users size={18} />
-                Khách hàng
-              </NavLink>
             </>
+          )}
+          
+          {(!isStoreMode && user?.role === 'SUPER_ADMIN' || user?.role === 'STORE_ADMIN') && (
+            <NavLink to="/admin/customers" className={navItemClass}>
+              <Users size={18} />
+              Khách hàng
+            </NavLink>
           )}
           
           {(user?.role === 'SUPER_ADMIN' || user?.role === 'STORE_ADMIN') && (

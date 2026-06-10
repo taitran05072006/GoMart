@@ -61,8 +61,9 @@ public class AuthController {
         try {
             Long id = Long.parseLong(uid);
             User u = userRepository.findById(id).orElse(null);
-            if (u == null || u.getRole() != Role.SUPER_ADMIN) return ApiResponse.error("Forbidden");
-            return userService.getAllUsersForAdmin();
+            if (u == null || (u.getRole() != Role.SUPER_ADMIN && u.getRole() != Role.STORE_ADMIN)) return ApiResponse.error("Forbidden");
+            Long storeId = u.getStore() != null ? u.getStore().getId() : null;
+            return userService.getAllUsersForAdmin(u.getRole(), storeId);
         } catch (NumberFormatException ex) {
             return ApiResponse.error("Forbidden");
         }

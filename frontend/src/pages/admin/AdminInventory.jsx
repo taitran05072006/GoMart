@@ -7,6 +7,21 @@ import inventoryService from '../../services/inventoryService';
 
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
 
+const getExpiryStatus = (expiryDate, thresholdDays) => {
+  if (!expiryDate) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const exp = new Date(expiryDate);
+  exp.setHours(0, 0, 0, 0);
+
+  const diffTime = exp - today;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return { status: 'EXPIRED', days: Math.abs(diffDays) };
+  if (diffDays <= (thresholdDays || 30)) return { status: 'WARNING', days: diffDays };
+  return null;
+};
+
 const AdminInventory = () => {
   const { user, impersonatedStoreId } = useContext(AuthContext);
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
@@ -20,6 +35,7 @@ const AdminInventory = () => {
   const [history, setHistory] = useState([]);
   const [tab, setTab] = useState('summary');
   const [search, setSearch] = useState('');
+  const [filterExpiry, setFilterExpiry] = useState('all');
   const [historyMode, setHistoryMode] = useState('all');
   const [historyMonth, setHistoryMonth] = useState('');
   const [historyDate, setHistoryDate] = useState('');
@@ -115,14 +131,26 @@ const AdminInventory = () => {
   }, [summary]);
 
   const filteredProducts = useMemo(() => {
+    let result = summary.products;
+    
+    if (filterExpiry === 'warning') {
+      result = result.filter(item => {
+        const status = getExpiryStatus(item.expiryDate, item.expiryThresholdDays);
+        return status !== null;
+      });
+    }
+
     const keyword = search.trim().toLowerCase();
-    if (!keyword) return summary.products;
-    return summary.products.filter((item) =>
-      [item.productName, item.unit]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(keyword))
-    );
-  }, [search, summary.products]);
+    if (keyword) {
+      result = result.filter((item) =>
+        [item.productName, item.unit]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(keyword))
+      );
+    }
+    
+    return result;
+  }, [search, filterExpiry, summary.products]);
 
   const selectedProduct = useMemo(() => {
     if (!selectedProductId) return null;
@@ -208,6 +236,16 @@ const AdminInventory = () => {
           className="w-full border-0 bg-transparent p-0 text-sm outline-none focus:ring-0"
           placeholder="Tìm sản phẩm trong tồn kho..."
         />
+        
+        <select
+          value={filterExpiry}
+          onChange={(e) => setFilterExpiry(e.target.value)}
+          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-amber-200"
+        >
+          <option value="all">Tất cả hạn sử dụng</option>
+          <option value="warning">⚠️ Sắp / Đã hết hạn</option>
+        </select>
+
         <button
           type="button"
           onClick={loadData}
@@ -246,17 +284,38 @@ const AdminInventory = () => {
                   <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-500">Sản phẩm</h3>
                 </div>
                 <div className="max-h-[520px] overflow-y-auto">
-                  {filteredProducts.map((product) => (
-                    <button
-                      key={product.productId}
-                      type="button"
-                      onClick={() => setSelectedProductId(String(product.productId))}
-                      className={`w-full border-b border-slate-100 px-5 py-4 text-left transition hover:bg-slate-50 ${String(selectedProductId) === String(product.productId) ? 'bg-blue-50/70' : 'bg-white'}`}
-                    >
-                      <p className="font-semibold text-slate-900">{product.productName}</p>
-                      <p className="text-xs text-slate-500">Tổng tồn: {product.totalQuantity || 0}</p>
-                    </button>
-                  ))}
+                  {filteredProducts.map((product) => {
+                    const expiryInfo = getExpiryStatus(product.expiryDate, product.expiryThresholdDays);
+                    const isWarning = expiryInfo?.status === 'WARNING';
+                    const isExpired = expiryInfo?.status === 'EXPIRED';
+                    const highlightClass = isExpired ? 'bg-rose-50 border-rose-200' : isWarning ? 'bg-amber-50 border-amber-200' : 'bg-white border-b-slate-100';
+
+                    return (
+                      <button
+                        key={product.productId}
+                        type="button"
+                        onClick={() => setSelectedProductId(String(product.productId))}
+                        className={`w-full border-b px-5 py-4 text-left transition hover:bg-slate-50 ${String(selectedProductId) === String(product.productId) ? 'bg-blue-50/70 border-blue-200' : highlightClass}`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-semibold text-slate-900">{product.productName}</p>
+                            <p className="text-xs text-slate-500 mt-0.5">Tổng tồn: <span className="font-bold text-blue-600">{product.totalQuantity || 0}</span></p>
+                          </div>
+                          {isExpired && (
+                            <span className="inline-flex items-center rounded-md bg-rose-100 px-2 py-1 text-[10px] font-bold text-rose-700 ring-1 ring-inset ring-rose-600/20">
+                              Hết hạn {expiryInfo.days} ngày
+                            </span>
+                          )}
+                          {isWarning && (
+                            <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                              Còn {expiryInfo.days} ngày
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
                   {filteredProducts.length === 0 && (
                     <div className="px-5 py-10 text-sm text-slate-500">Chưa có dữ liệu tồn kho phù hợp.</div>
                   )}

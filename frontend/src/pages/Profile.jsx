@@ -340,7 +340,6 @@ const Profile = () => {
 
     try {
       await orderService.requestReturn(order.id, reason);
-      toast.success("Yêu cầu hoàn trả đã được gửi!");
       fetchOrders();
       setSelectedOrder(null);
     } catch (err) {
@@ -428,6 +427,27 @@ const Profile = () => {
     return 'Không rõ';
   };
 
+  const statusLabel = (status) => {
+    switch (status) {
+      case 'PENDING': return 'Chờ xác nhận';
+      case 'PAID': return 'Đã thanh toán';
+      case 'CONFIRMED': return 'Đã xác nhận';
+      case 'PACKING': return 'Đang đóng gói';
+      case 'SHIPPING': return 'Đang giao hàng';
+      case 'DELIVERED': return 'Đã giao';
+      case 'DELIVERY_DISPUTE': return 'Khiếu nại chưa nhận';
+      case 'COMPLETED': return 'Hoàn thành';
+      case 'CANCELLED': return 'Đã hủy';
+      case 'LOST': return 'Thất lạc';
+      case 'RETURN_REQUESTED': return 'Yêu cầu hoàn trả';
+      case 'RETURN_PICKING': return 'Đang lấy hàng hoàn';
+      case 'RETURN_AWAITING_ADMIN_CONFIRM': return 'Chờ duyệt hàng về kho';
+      case 'RETURNED_TO_WAREHOUSE': return 'Hàng đã về kho';
+      case 'RETURNED': return 'Đã hoàn tiền';
+      default: return status;
+    }
+  };
+
   const paymentMethodClass = (method) => {
     if (method === 'COD') return 'bg-sky-50 text-sky-700 border border-sky-200';
     if (method === 'BANK_TRANSFER') return 'bg-amber-50 text-amber-700 border border-amber-200';
@@ -497,14 +517,7 @@ const Profile = () => {
               <div className="rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">
                 {user?.rewardStars || 0} sao tích lũy
               </div>
-              <div className={`rounded-full px-4 py-1 text-xs font-bold uppercase tracking-widest shadow-sm ${
-                user?.tier === 'DIAMOND' ? 'bg-indigo-600 text-white' :
-                user?.tier === 'GOLD' ? 'bg-yellow-400 text-black' :
-                user?.tier === 'SILVER' ? 'bg-gray-300 text-gray-800' :
-                'bg-emerald-100 text-emerald-700'
-              }`}>
-                {user?.tier || 'MEMBER'}
-              </div>
+
             </div>
          </div>
 
@@ -536,14 +549,7 @@ const Profile = () => {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                <div className="flex items-center justify-between mb-6">
                  <h2 className="text-2xl font-bold text-gray-800">Thông tin cá nhân</h2>
-                 <span className={`px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-tighter shadow-sm border ${
-                    user?.tier === 'DIAMOND' ? 'bg-indigo-600 text-white border-indigo-400' :
-                    user?.tier === 'GOLD' ? 'bg-yellow-400 text-black border-yellow-300' :
-                    user?.tier === 'SILVER' ? 'bg-gray-100 text-gray-800 border-gray-300' :
-                    'bg-emerald-50 text-emerald-700 border-emerald-200'
-                 }`}>
-                   Hạng {user?.tier || 'MEMBER'}
-                 </span>
+
                </div>
                <form onSubmit={handleUpdateProfile} className="space-y-6 max-w-xl">
                  <div>
@@ -633,7 +639,7 @@ const Profile = () => {
                       order.status === 'RETURNED' ? 'bg-slate-100 text-slate-700 border border-slate-200' :
                       'bg-slate-50 text-slate-500'
                     }`}>
-                      {order.status}
+                      {statusLabel(order.status)}
                     </span>
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${paymentMethodClass(order.paymentMethod)}`}>
                       {paymentMethodLabel(order.paymentMethod)}
@@ -725,7 +731,7 @@ const Profile = () => {
               </p>
             </div>
             <span className="inline-flex rounded-full bg-white/15 px-4 py-2 text-sm font-semibold uppercase tracking-wide">
-              {selectedOrder.status}
+              {statusLabel(selectedOrder.status)}
             </span>
           </div>
         </div>

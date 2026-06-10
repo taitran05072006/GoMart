@@ -26,14 +26,6 @@ const AdminStockReceiptForm = () => {
   const { user, impersonatedStoreId } = useContext(AuthContext);
   const isGlobalMode = user?.role === 'SUPER_ADMIN' && !impersonatedStoreId;
 
-  if (user?.role !== 'SUPER_ADMIN' && user?.role !== 'STORE_ADMIN') {
-    return <Navigate to="/admin/store-products" replace />;
-  }
-
-  if (isGlobalMode) {
-    return <Navigate to="/admin/stock-receipts" replace />;
-  }
-
   const selectedStoreId = user?.role === 'SUPER_ADMIN' ? impersonatedStoreId : user?.storeId;
   const canCreateReceipt = Boolean(selectedStoreId);
   useEffect(() => {
@@ -61,7 +53,7 @@ const AdminStockReceiptForm = () => {
       return;
     }
     import('../../api/axiosClient').then(({ default: axios }) => {
-      axios.get(`/stores/${selectedStoreId}/products`).then(res => {
+      axios.get(`/stores/${selectedStoreId}/products?includeOutOfStock=true`).then(res => {
         const data = res?.data?.data || res?.data || res;
         setAllProducts(Array.isArray(data) ? data : []);
       }).catch(err => {
@@ -87,6 +79,14 @@ const AdminStockReceiptForm = () => {
       0
     );
   }, [form.items]);
+
+  if (user?.role !== 'SUPER_ADMIN' && user?.role !== 'STORE_ADMIN') {
+    return <Navigate to="/admin/store-products" replace />;
+  }
+
+  if (isGlobalMode) {
+    return <Navigate to="/admin/stock-receipts" replace />;
+  }
 
   const handleRootChange = (event) => {
     const { name, value } = event.target;
@@ -267,8 +267,8 @@ const AdminStockReceiptForm = () => {
 
           <div className="space-y-3">
             {form.items.map((item, index) => (
-              <div key={index} className="grid gap-3 rounded-xl border border-slate-200 p-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1.1fr_1.1fr_1.1fr_auto] items-start">
-                <div className="relative">
+              <div key={index} className="grid gap-x-4 gap-y-5 rounded-2xl border border-slate-200 p-5 lg:grid-cols-12 items-start bg-slate-50/50">
+                <div className="relative lg:col-span-4">
                   <label className="mb-2 block text-sm font-semibold text-slate-700">Sản phẩm *</label>
                   <input
                     type="text"
@@ -281,7 +281,7 @@ const AdminStockReceiptForm = () => {
                       setProductSuggestionsIndex(index);
                     }}
                     onFocus={() => setProductSuggestionsIndex(index)}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100 bg-white"
                   />
                   {productSuggestionsIndex === index && item.productName && (
                     <div className="absolute z-10 w-full mt-1 bg-white border rounded-xl shadow-lg max-h-40 overflow-y-auto">
@@ -317,18 +317,18 @@ const AdminStockReceiptForm = () => {
                   )}
                 </div>
                 {/* Đơn vị (hiển thị/nhập) */}
-                <div>
+                <div className="lg:col-span-2">
                   <label className="mb-2 block text-sm font-semibold text-slate-700">Đơn vị</label>
                   <input
                     type="text"
                     value={item.unit || ''}
-                    onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
-                    placeholder="e.g. chai, hộp"
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+                    readOnly
+                    placeholder="e.g. chai"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none bg-slate-50 text-slate-500 cursor-not-allowed"
                   />
                 </div>
                 {/* Đơn vị nhập (gõ hoặc chọn) */}
-                <div>
+                <div className="lg:col-span-3">
                   <label className="mb-2 block text-sm font-semibold text-slate-700">Đơn vị nhập</label>
                   <div>
                     {(() => {
@@ -349,7 +349,7 @@ const AdminStockReceiptForm = () => {
                                 }
                               }
                             }}
-                            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+                            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100 bg-white"
                           >
                             <option value="">-- Chọn đơn vị --</option>
                             {product.importUnits.map((u, i) => (
@@ -363,10 +363,10 @@ const AdminStockReceiptForm = () => {
                           <input
                             type="text"
                             list={`importUnitList-${index}`}
-                            placeholder="Nhập đơn vị nhập..."
+                            placeholder="Nhập đơn vị..."
                             value={item.importUnitName || ''}
                             onChange={(e) => handleItemChange(index, 'importUnitName', e.target.value)}
-                            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+                            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100 bg-white"
                           />
                           <datalist id={`importUnitList-${index}`}>
                             {Array.from(new Set(allImportUnitTypes.map(u => u.name))).filter(Boolean).map((name, i) => (
@@ -380,14 +380,14 @@ const AdminStockReceiptForm = () => {
                 </div>
 
                 {/* Số lượng */}
-                <div>
+                <div className="lg:col-span-3">
                   <label className="mb-2 block text-sm font-semibold text-slate-700">Số lượng *</label>
                   <input
                     type="number"
                     min="1"
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100 bg-white"
                     required
                   />
                   {(() => {
@@ -408,14 +408,14 @@ const AdminStockReceiptForm = () => {
                 </div>
 
                 {/* Giá nhập */}
-                <div>
+                <div className="lg:col-span-3">
                   <label className="mb-2 block text-sm font-semibold text-slate-700">Giá nhập *</label>
                   <input
                     type="number"
                     min="0"
                     value={item.price}
                     onChange={(e) => handleItemChange(index, 'price', e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100 bg-white"
                     required
                   />
                   {(() => {
@@ -436,9 +436,9 @@ const AdminStockReceiptForm = () => {
                 </div>
 
                 {/* Thành tiền */}
-                <div>
+                <div className="lg:col-span-3">
                   <label className="mb-2 block text-sm font-semibold text-slate-700">Thành tiền</label>
-                  <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 h-[46px] flex items-center justify-start truncate">
+                  <div className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 h-[46px] flex items-center justify-start truncate">
                     {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(item.quantity || 0) * Number(item.price || 0))}
                   </div>
                 </div>
@@ -448,6 +448,7 @@ const AdminStockReceiptForm = () => {
                   type="date"
                   value={item.manufactureDate}
                   onChange={(event) => handleItemChange(index, 'manufactureDate', event.target.value)}
+                  wrapperClassName="lg:col-span-2"
                   required
                 />
                 <Field
@@ -455,14 +456,15 @@ const AdminStockReceiptForm = () => {
                   type="date"
                   value={item.expiryDate}
                   onChange={(event) => handleItemChange(index, 'expiryDate', event.target.value)}
+                  wrapperClassName="lg:col-span-2"
                   required
                 />
-                <div>
+                <div className="lg:col-span-2">
                   <label className="mb-2 block text-sm font-semibold text-transparent select-none">Hành động</label>
                   <button
                     type="button"
                     onClick={() => removeItem(index)}
-                    className="h-[46px] w-full flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-100 transition whitespace-nowrap"
+                    className="h-[46px] w-full flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-100 transition whitespace-nowrap"
                   >
                     Hủy bỏ
                   </button>
@@ -470,6 +472,14 @@ const AdminStockReceiptForm = () => {
               </div>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={addItem}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 py-4 text-sm font-bold text-slate-500 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-700 transition"
+          >
+            + Thêm item mới
+          </button>
 
           <p className="mt-4 text-sm font-semibold text-slate-700">Tổng cộng: {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalPrice)}</p>
         </div>
@@ -496,12 +506,12 @@ const AdminStockReceiptForm = () => {
   );
 };
 
-const Field = ({ label, ...props }) => (
-  <div>
+const Field = ({ label, wrapperClassName, ...props }) => (
+  <div className={wrapperClassName}>
     <label className="mb-2 block text-sm font-semibold text-slate-700">{label}</label>
     <input
       {...props}
-      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100"
+      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-amber-100 bg-white"
     />
   </div>
 );

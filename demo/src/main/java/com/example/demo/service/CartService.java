@@ -126,7 +126,6 @@ public class CartService {
 
         String targetUnit = unit != null ? unit.trim() : "";
 
-        // Check if there's ANOTHER item with the same product ID and same target unit
         CartItem existingItem = cart.getItems().stream()
                 .filter(i -> !i.getId().equals(cartItemId)
                         && i.getProduct().getId().equals(item.getProduct().getId())
@@ -138,7 +137,6 @@ public class CartService {
             existingItem.setQuantity(existingItem.getQuantity() + item.getQuantity());
             cart.getItems().remove(item);
         } else {
-            // Just update current item
             item.setUnit(unit);
             item.setConversionRate(conversionRate != null ? conversionRate : 1.0);
         }
@@ -147,7 +145,6 @@ public class CartService {
         return mapToDto(cart);
     }
 
-    // ================= MAPPER =================
     private CartResponseDto mapToDto(Cart cart) {
         List<CartItemResponseDto> itemss = cart.getItems() == null ? List.of() :
                 cart.getItems().stream().map(i -> {
