@@ -16,7 +16,6 @@ Backend (Spring Boot REST API)
 │
 ├── Spring Security + JWT
 ├── JPA / Hibernate
-├── MQTT Integration
 └── Email Service (SMTP)
 │
 ▼
@@ -74,7 +73,6 @@ MySQL Database (Aiven Cloud)
 
 ### Infrastructure & Deployment
 - **Database:** MySQL (Hosted on Aiven Cloud)
-- **Message Broker:** MQTT / Mosquitto (For real-time features)
 - **Deployment Hosting:** Vercel (Frontend), Render (Backend)
 
 ## ✨ Key Features
